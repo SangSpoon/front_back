@@ -66,7 +66,7 @@ export default function Index() {
   };
 
   if (!showLogin) {
-    // 초기 화면: 시스템 소개 페이지 (NeuroScan 스타일)
+    // 초기 화면: 시스템 소개 페이지
     return (
       <div className="min-h-screen bg-gray-50">
         {/* 헤더 */}
@@ -75,7 +75,7 @@ export default function Index() {
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center">
                 <Droplets className="h-8 w-8 text-blue-600 mr-3" />
-                <span className="text-xl font-bold text-gray-900">아쿠아모니터</span>
+                <span className="text-xl font-bold text-gray-900">상수도모니터</span>
               </div>
               <div className="flex items-center space-x-4">
                 <Button 
@@ -198,7 +198,7 @@ export default function Index() {
           <div className="flex items-center justify-center mb-4">
             <Droplets className="h-12 w-12 text-blue-600" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">아쿠아모니터</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">상수도모니터</h1>
           <p className="text-gray-600">상수도 관리 시스템</p>
         </div>
 

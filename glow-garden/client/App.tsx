@@ -11,7 +11,7 @@ import SignUp from "./pages/SignUp";
 import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import SiteManagement from "./pages/SiteManagement";
-import DataEntry from "./pages/DataEntry";
+
 import SiteDetails from "./pages/SiteDetails";
 import Statistics from "./pages/Statistics";
 import Settings from "./pages/Settings";
@@ -48,11 +48,7 @@ const App = () => (
                 <SiteDetails />
               </ProtectedRoute>
             } />
-            <Route path="/data-entry" element={
-              <ProtectedRoute>
-                <DataEntry />
-              </ProtectedRoute>
-            } />
+
             <Route path="/statistics" element={
               <ProtectedRoute>
                 <Statistics />
