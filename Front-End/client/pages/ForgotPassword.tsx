@@ -30,16 +30,18 @@ export default function ForgotPassword() {
 
   if (isSubmitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-white">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-200">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
-              <Droplets className="h-12 w-12 text-blue-600" />
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-400/80 to-indigo-500/80 rounded-full flex items-center justify-center shadow-2xl backdrop-blur-sm border border-white/20">
+                <Droplets className="h-8 w-8 text-white drop-shadow-lg" />
+              </div>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Check Your Email</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">이메일을 확인하세요</h1>
           </div>
 
-          <Card className="shadow-lg">
+          <Card className="shadow-2xl bg-white/90 backdrop-blur-sm border border-white/20">
             <CardContent className="pt-6">
               <div className="text-center space-y-4">
                 <div className="flex items-center justify-center">
@@ -63,9 +65,12 @@ export default function ForgotPassword() {
 
                 <div className="space-y-3 pt-4">
                   <Link to="/" className="block">
-                    <Button variant="outline" className="w-full">
+                    <Button 
+                      variant="outline" 
+                      className="w-full text-blue-700 border-blue-300 bg-white/80 backdrop-blur-sm hover:bg-white transition-all duration-200"
+                    >
                       <ArrowLeft className="h-4 w-4 mr-2" />
-                      Back to Sign In
+                      로그인으로 돌아가기
                     </Button>
                   </Link>
                   
@@ -73,9 +78,9 @@ export default function ForgotPassword() {
                     variant="ghost" 
                     size="sm"
                     onClick={() => setIsSubmitted(false)}
-                    className="w-full text-sm"
+                    className="w-full text-sm text-blue-600 hover:text-blue-800 transition-colors duration-200"
                   >
-                    Didn't receive email? Try again
+                    이메일을 받지 못하셨나요? 다시 시도
                   </Button>
                 </div>
               </div>
@@ -87,21 +92,23 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-white">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-200">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <Droplets className="h-12 w-12 text-blue-600" />
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-400/80 to-indigo-500/80 rounded-full flex items-center justify-center shadow-2xl backdrop-blur-sm border border-white/20">
+              <Droplets className="h-8 w-8 text-white drop-shadow-lg" />
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Reset Password</h1>
-          <p className="text-gray-600">Enter your email to receive a reset link</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">비밀번호 재설정</h1>
+          <p className="text-gray-600">이메일을 입력하여 재설정 링크를 받으세요</p>
         </div>
 
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-xl text-center">Forgot Password</CardTitle>
+        <Card className="shadow-2xl bg-white/90 backdrop-blur-sm border border-white/20">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+            <CardTitle className="text-xl text-center text-blue-900">비밀번호 찾기</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium text-gray-700">
@@ -123,24 +130,27 @@ export default function ForgotPassword() {
                 {error && <p className="text-xs text-red-500">{error}</p>}
               </div>
 
-              <Button type="submit" className="w-full">
-                Send Reset Link
+              <Button 
+                type="submit" 
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 font-semibold"
+              >
+                재설정 링크 보내기
               </Button>
 
               <div className="text-center space-y-2">
                 <Link
                   to="/"
-                  className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                  className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors duration-200"
                 >
                   <ArrowLeft className="h-3 w-3 mr-1" />
-                  Back to Sign In
+                  로그인으로 돌아가기
                 </Link>
                 <br />
                 <Link
                   to="/signup"
-                  className="text-sm text-gray-600 hover:text-gray-800 hover:underline"
+                  className="text-sm text-blue-500 hover:text-blue-700 hover:underline transition-colors duration-200"
                 >
-                  Don't have an account? Sign up
+                  계정이 없으신가요? 회원가입
                 </Link>
               </div>
             </form>

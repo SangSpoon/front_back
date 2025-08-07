@@ -68,7 +68,7 @@ export default function Index() {
   if (!showLogin) {
     // 초기 화면: 시스템 소개 페이지
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-200">
         {/* 헤더 */}
         <header className="bg-white shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -81,13 +81,13 @@ export default function Index() {
                 <Button 
                   variant="outline"
                   onClick={() => setShowLogin(true)}
-                  className="text-gray-700 border-gray-300"
+                  className="text-blue-700 border-blue-300 hover:bg-blue-50 transition-colors duration-200"
                 >
                   로그인
                 </Button>
                 <Button 
                   onClick={() => setShowLogin(true)}
-                  className="bg-blue-600 text-white hover:bg-blue-700"
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
                 >
                   회원가입
                 </Button>
@@ -97,14 +97,14 @@ export default function Index() {
         </header>
 
         {/* 메인 콘텐츠 */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center">
-            {/* 메인 로고 아이콘 */}
-            <div className="flex justify-center mb-8">
-              <div className="w-32 h-32 bg-blue-100 rounded-full flex items-center justify-center">
-                <Droplets className="h-16 w-16 text-blue-600" />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 relative">
+                      <div className="text-center relative z-10">
+              {/* 메인 로고 아이콘 */}
+              <div className="flex justify-center mb-8">
+                <div className="w-32 h-32 bg-gradient-to-br from-blue-400/80 to-indigo-500/80 rounded-full flex items-center justify-center shadow-2xl transform hover:scale-105 transition-transform duration-300 backdrop-blur-sm border border-white/20">
+                  <Droplets className="h-16 w-16 text-white drop-shadow-lg" />
+                </div>
               </div>
-            </div>
 
             {/* 메인 타이틀 */}
             <h1 className="text-4xl font-bold text-gray-900 mb-4">
@@ -116,29 +116,22 @@ export default function Index() {
             </p>
 
             {/* 액션 버튼들 */}
-            <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mb-16">
+            <div className="flex justify-center mb-16">
               <Button 
                 onClick={() => setShowLogin(true)}
                 size="lg"
-                className="bg-blue-600 text-white hover:bg-blue-700 px-8 py-3 text-lg font-semibold"
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
               >
                 <Activity className="h-5 w-5 mr-2" />
                 시스템 시작하기
-              </Button>
-              <Button 
-                variant="outline"
-                size="lg"
-                className="text-gray-700 border-gray-300 px-8 py-3 text-lg"
-              >
-                더 알아보기
               </Button>
             </div>
 
             {/* 기능 카드들 */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-              <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 text-center">
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <Activity className="h-6 w-6 text-blue-600" />
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-white/20 text-center hover:bg-white/90 transition-all duration-300 transform hover:-translate-y-2">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Activity className="h-6 w-6 text-white" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">현장 관리</h3>
                 <p className="text-sm text-gray-600">
@@ -146,9 +139,9 @@ export default function Index() {
                 </p>
               </div>
 
-              <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 text-center">
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <Gauge className="h-6 w-6 text-green-600" />
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-white/20 text-center hover:bg-white/90 transition-all duration-300 transform hover:-translate-y-2">
+                <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-lg flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Gauge className="h-6 w-6 text-white" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">실시간 데이터 수집</h3>
                 <p className="text-sm text-gray-600">
@@ -156,9 +149,9 @@ export default function Index() {
                 </p>
               </div>
 
-              <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 text-center">
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <Droplets className="h-6 w-6 text-blue-600" />
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-white/20 text-center hover:bg-white/90 transition-all duration-300 transform hover:-translate-y-2">
+                <div className="w-12 h-12 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-lg flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Droplets className="h-6 w-6 text-white" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">통합 대시보드</h3>
                 <p className="text-sm text-gray-600">
@@ -166,9 +159,9 @@ export default function Index() {
                 </p>
               </div>
 
-              <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 text-center">
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <Zap className="h-6 w-6 text-purple-600" />
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-white/20 text-center hover:bg-white/90 transition-all duration-300 transform hover:-translate-y-2">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Zap className="h-6 w-6 text-white" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">현장별 상세 정보</h3>
                 <p className="text-sm text-gray-600">
@@ -192,21 +185,23 @@ export default function Index() {
 
   // 로그인 화면
   return (
-    <div className="min-h-screen flex items-center justify-center p-8 bg-gradient-to-br from-blue-50 to-white">
+    <div className="min-h-screen flex items-center justify-center p-8 bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-200">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <div className="flex items-center justify-center mb-4">
-            <Droplets className="h-12 w-12 text-blue-600" />
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-400/80 to-indigo-500/80 rounded-full flex items-center justify-center shadow-2xl backdrop-blur-sm border border-white/20">
+              <Droplets className="h-8 w-8 text-white drop-shadow-lg" />
+            </div>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">상수도모니터</h1>
           <p className="text-gray-600">상수도 관리 시스템</p>
         </div>
 
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-xl text-center">로그인</CardTitle>
+        <Card className="shadow-2xl bg-white/90 backdrop-blur-sm border border-white/20">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+            <CardTitle className="text-xl text-center text-blue-900">로그인</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             <form onSubmit={handleLogin} className="space-y-4">
               {/* 에러 메시지 */}
               {error && (
@@ -264,7 +259,11 @@ export default function Index() {
                 </label>
               </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button 
+                type="submit" 
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 font-semibold" 
+                disabled={isLoading}
+              >
                 {isLoading ? "로그인 중..." : "로그인"}
               </Button>
 
@@ -272,19 +271,19 @@ export default function Index() {
                 <button
                   type="button"
                   onClick={() => setShowLogin(false)}
-                  className="text-sm text-gray-600 hover:text-gray-800 hover:underline block w-full"
+                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline block w-full transition-colors duration-200"
                 >
                   ← 메인으로 돌아가기
                 </button>
                 <Link
                   to="/signup"
-                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline block"
+                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline block transition-colors duration-200"
                 >
                   계정이 없으신가요? 회원가입
                 </Link>
                 <Link
                   to="/forgot-password"
-                  className="text-sm text-gray-600 hover:text-gray-800 hover:underline block"
+                  className="text-sm text-blue-500 hover:text-blue-700 hover:underline block transition-colors duration-200"
                 >
                   비밀번호를 잊으셨나요?
                 </Link>

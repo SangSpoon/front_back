@@ -24,6 +24,7 @@ public class SiteEntity {
     private double length; // 가로
     private double width; // 세로
     private double height; // 높이
+    @Enumerated(EnumType.STRING)
     private Status status;
 
     @ManyToOne

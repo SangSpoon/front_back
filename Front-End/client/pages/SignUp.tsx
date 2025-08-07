@@ -125,21 +125,23 @@ export default function SignUp() {
 
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-white">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-200">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <Droplets className="h-12 w-12 text-blue-600" />
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-400/80 to-indigo-500/80 rounded-full flex items-center justify-center shadow-2xl backdrop-blur-sm border border-white/20">
+              <Droplets className="h-8 w-8 text-white drop-shadow-lg" />
+            </div>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">회원가입</h1>
-          <p className="text-gray-600">수질 모니터링 시스템에 가입하세요</p>
+          <p className="text-gray-600">상수도 관리 시스템에 가입하세요</p>
         </div>
 
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-xl text-center">회원가입</CardTitle>
+        <Card className="shadow-2xl bg-white/90 backdrop-blur-sm border border-white/20">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+            <CardTitle className="text-xl text-center text-blue-900">회원가입</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* 일반 에러 메시지 */}
               {errors.general && (
@@ -269,7 +271,7 @@ export default function SignUp() {
 
               <Button 
                 type="submit" 
-                className="w-full" 
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 font-semibold" 
                 size="lg"
                 disabled={isSubmitting}
               >
@@ -279,7 +281,7 @@ export default function SignUp() {
               <div className="text-center">
                 <Link
                   to="/"
-                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors duration-200"
                 >
                   이미 계정이 있으신가요? 로그인하기
                 </Link>
