@@ -15,6 +15,7 @@ import SiteManagement from "./pages/SiteManagement";
 import SiteDetails from "./pages/SiteDetails";
 import Statistics from "./pages/Statistics";
 import Settings from "./pages/Settings";
+import Test from "./pages/Test";
 import NotFound from "./pages/NotFound";
 import AuthExample from "./components/AuthExample";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -57,6 +58,11 @@ const App = () => (
             <Route path="/settings" element={
               <ProtectedRoute>
                 <Settings />
+              </ProtectedRoute>
+            } />
+            <Route path="/test" element={
+              <ProtectedRoute>
+                <Test />
               </ProtectedRoute>
             } />
             <Route path="/api-test" element={<AuthExample />} />

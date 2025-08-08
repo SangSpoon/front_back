@@ -25,7 +25,8 @@ import {
   Clock,
   Settings,
   LogOut,
-  X
+  X,
+  TestTube
 } from "lucide-react";
 
 // Sample data for demonstration
@@ -737,7 +738,7 @@ export default function Dashboard() {
             <CardTitle>빠른 이동</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <Button asChild className="h-20 text-base">
                 <Link to="/sites" className="flex flex-col items-center justify-center space-y-2">
                   <MapPin className="h-6 w-6" />
@@ -754,6 +755,12 @@ export default function Dashboard() {
                 <Link to="/settings" className="flex flex-col items-center justify-center space-y-2">
                   <Settings className="h-6 w-6" />
                   <span>설정</span>
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="h-20 text-base">
+                <Link to="/test" className="flex flex-col items-center justify-center space-y-2">
+                  <TestTube className="h-6 w-6" />
+                  <span>테스트</span>
                 </Link>
               </Button>
             </div>
