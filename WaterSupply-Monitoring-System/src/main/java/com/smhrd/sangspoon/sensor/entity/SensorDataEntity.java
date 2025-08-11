@@ -24,9 +24,7 @@ public class SensorDataEntity {
     private LocalDateTime receivedAt;
     private String rawData; // 원본 프로토콜
 
-
     @ManyToOne
-    @JoinColumn(name = "site_management_code", nullable = false)
+    @JoinColumn(name = "site_management_code", nullable = true)
     private SiteEntity site;
-
 }
