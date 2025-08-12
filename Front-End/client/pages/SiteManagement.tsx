@@ -95,19 +95,7 @@ export default function SiteManagement() {
     }
   };
 
-  const handleInputChange = (field: keyof Site, value: any) => {
-    setFormData(prev => {
-      const updated = { ...prev, [field]: value };
-
-      // Auto-calculate volume when dimensions change (but not for text fields)
-      if (["tankType", "width", "length", "height"].includes(field)) {
-        const { tankType = "circular", width = 0, length = 0, height = 0 } = updated;
-        updated.volume = calculateVolume(tankType as "circular" | "square", width, length, height);
-      }
-
-      return updated;
-    });
-  };
+  // handleInputChange는 현재 사용하지 않으므로 제거하거나 향후 필요 시 다시 추가하세요.
 
   // Memoized input change handlers to prevent re-creation and focus loss
   const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

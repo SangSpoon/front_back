@@ -23,7 +23,7 @@ public class MemberApiController {
     public ResponseEntity<Map<String, Object>> register(@RequestBody Map<String, String> requestData) {
         Map<String, Object> response = new HashMap<>();
         
-        System.out.println("회원가입 요청 받음: " + requestData.toString());
+        // 요청 로그는 필요 시 로거를 사용하세요
         
         try {
             // Map에서 MemberEntity로 변환
@@ -34,12 +34,12 @@ public class MemberApiController {
             member.setPhoneNumber(requestData.get("phoneNumber"));
             member.setPassword(requestData.get("password"));
             
-            System.out.println("변환된 Member: " + member.toString());
+            // 디버그 로그는 로거 사용 권장
             
             memberService.registerMember(member);
             response.put("success", true);
             response.put("message", "회원가입이 완료되었습니다.");
-            System.out.println("회원가입 성공");
+            // 디버그 로그는 로거 사용 권장
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             response.put("success", false);
