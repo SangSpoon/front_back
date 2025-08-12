@@ -42,13 +42,11 @@ public class MemberApiController {
             System.out.println("회원가입 성공");
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            System.out.println("회원가입 실패: " + e.getMessage());
             response.put("success", false);
             response.put("message", e.getMessage());
             return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
-            System.out.println("회원가입 예외: " + e.getMessage());
-            e.printStackTrace();
+            // 내부 에러 상세는 로깅으로만 남기고 응답은 간략화
             response.put("success", false);
             response.put("message", "서버 오류가 발생했습니다.");
             return ResponseEntity.status(500).body(response);
