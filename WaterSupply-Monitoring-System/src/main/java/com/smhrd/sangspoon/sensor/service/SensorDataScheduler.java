@@ -49,12 +49,13 @@ public class SensorDataScheduler {
         if (!isRunning) return;
         
         try {
-            // 🎯 데이터 중복 체크 - 1분 이내에 이미 데이터가 있는지 확인
+            // 🎯 데이터 중복 체크 - 현재 분에 이미 데이터가 있는지 확인
             LocalDateTime now = LocalDateTime.now();
-            LocalDateTime oneMinuteAgo = now.minusMinutes(1);
+            LocalDateTime currentMinuteStart = now.withSecond(0).withNano(0);
+            LocalDateTime nextMinuteStart = currentMinuteStart.plusMinutes(1);
             
             boolean dataExists = parsedDataRepository.existsBySiteIdAndCreatedAtBetween(
-                "001000", oneMinuteAgo, now
+                "001000", currentMinuteStart, nextMinuteStart
             );
             
             if (dataExists) {
