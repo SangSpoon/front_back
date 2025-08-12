@@ -4,6 +4,7 @@ import com.smhrd.sangspoon.sensor.entity.ParsedDataEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -17,4 +18,7 @@ public interface ParsedDataRepository extends JpaRepository<ParsedDataEntity, Lo
     
     // 모든 센서 데이터를 생성 시간 역순으로 조회
     List<ParsedDataEntity> findAllByOrderByCreatedAtDesc();
+    
+    // 🎯 데이터 중복 체크를 위한 메서드 - 특정 시간 범위 내에 데이터가 있는지 확인
+    boolean existsBySiteIdAndCreatedAtBetween(String siteId, LocalDateTime startTime, LocalDateTime endTime);
 }

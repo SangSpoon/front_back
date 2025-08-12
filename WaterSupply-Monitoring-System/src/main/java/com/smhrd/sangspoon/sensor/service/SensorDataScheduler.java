@@ -49,6 +49,19 @@ public class SensorDataScheduler {
         if (!isRunning) return;
         
         try {
+            // 🎯 데이터 중복 체크 - 1분 이내에 이미 데이터가 있는지 확인
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime oneMinuteAgo = now.minusMinutes(1);
+            
+            boolean dataExists = parsedDataRepository.existsBySiteIdAndCreatedAtBetween(
+                "001000", oneMinuteAgo, now
+            );
+            
+            if (dataExists) {
+                System.out.println("이미 데이터가 존재합니다. 생성하지 않습니다. (" + now + ")");
+                return; // 중복 방지!
+            }
+            
             // 현장 정보 가져오기 (관리번호 "001000")
             SiteEntity site = siteRepository.findById("001000")
                 .orElse(null); // null 허용

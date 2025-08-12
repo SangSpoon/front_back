@@ -221,6 +221,57 @@ export default function Test() {
     }
   };
 
+  // 🎯 최고의 해결방법: 시간 범위별 적응형 배경 선 설정
+  const getAdaptiveBackgroundLineSettings = (timeRange: string) => {
+    switch (timeRange) {
+      case "1h":
+        return {
+          opacity: 0.08,        // 매우 옅게 (거의 안 보임)
+          strokeWidth: 0.5,     // 매우 얇게
+          sampleInterval: 8,    // 8개 간격으로 샘플링 (복잡성 대폭 감소)
+          enabled: true         // 완전히 제거하지 않고 매우 옅게
+        };
+      case "6h":
+        return {
+          opacity: 0.25,        // 적당히 옅게
+          strokeWidth: 1,       // 기본 두께
+          sampleInterval: 3,    // 3개 간격으로 샘플링
+          enabled: true
+        };
+      case "12h":
+        return {
+          opacity: 0.35,        // 조금 진하게
+          strokeWidth: 1,       // 기본 두께
+          sampleInterval: 2,    // 2개 간격으로 샘플링
+          enabled: true
+        };
+      case "24h":
+        return {
+          opacity: 0.4,         // 더 진하게
+          strokeWidth: 1,       // 기본 두께
+          sampleInterval: 1,    // 모든 데이터 사용
+          enabled: true
+        };
+      case "3d":
+      case "7d":
+      case "1m":
+      case "3m":
+        return {
+          opacity: 0.5,         // 가장 진하게
+          strokeWidth: 1,       // 기본 두께
+          sampleInterval: 1,    // 모든 데이터 사용
+          enabled: true
+        };
+      default:
+        return {
+          opacity: 0.3,         // 기본값
+          strokeWidth: 1,       // 기본 두께
+          sampleInterval: 1,    // 모든 데이터 사용
+          enabled: true
+        };
+    }
+  };
+
   // 현장별 상세 데이터 가져오기 (더보기 기능 포함)
   const getSiteDetailData = (siteId: string) => {
     return sensorData
@@ -452,27 +503,40 @@ export default function Test() {
                           });
                         })()}
                         
-                        {/* 얇은 선으로 모든 데이터 연결 (배경) */}
+                        {/* 🎯 적응형 배경 선 - 시간 범위에 따라 자동 조정 */}
                         {(() => {
                           const data = getSelectedSiteData();
                           if (data.length === 0) return null;
+                          
+                          const settings = getAdaptiveBackgroundLineSettings(timeRange);
+                          if (!settings.enabled) return null;
                           
                           const startTime = new Date(data[data.length - 1].createdAt);
                           const endTime = new Date(data[0].createdAt);
                           const totalTimeRange = endTime.getTime() - startTime.getTime();
                           
-                          return data.map((dataPoint, index) => {
+                          // 샘플링된 데이터 포인트 생성 (복잡성 감소)
+                          const sampledBackgroundData = [];
+                          for (let i = 0; i < data.length; i += settings.sampleInterval) {
+                            sampledBackgroundData.push(data[i]);
+                          }
+                          // 마지막 데이터 포인트 추가
+                          if (data.length > 0 && !sampledBackgroundData.includes(data[data.length - 1])) {
+                            sampledBackgroundData.push(data[data.length - 1]);
+                          }
+                          
+                          return sampledBackgroundData.map((dataPoint, index) => {
                             if (index === 0) return null;
                             
                             const currentTime = new Date(dataPoint.createdAt);
-                            const prevTime = new Date(data[index - 1].createdAt);
+                            const prevTime = new Date(sampledBackgroundData[index - 1].createdAt);
                             
                             // X축 위치 계산 (정석적인 방식: 왼쪽이 과거, 오른쪽이 현재)
                             const currentX = 50 + ((currentTime.getTime() - startTime.getTime()) / totalTimeRange) * 700;
                             const prevX = 50 + ((prevTime.getTime() - startTime.getTime()) / totalTimeRange) * 700;
                             
                             const currentY = 280 - (dataPoint.waterLevel / 100) * 280;
-                            const prevY = 280 - (data[index - 1].waterLevel / 100) * 280;
+                            const prevY = 280 - (sampledBackgroundData[index - 1].waterLevel / 100) * 280;
                             
                             return (
                               <line
@@ -482,8 +546,8 @@ export default function Test() {
                                 x2={currentX}
                                 y2={currentY}
                                 stroke="#3b82f6"
-                                strokeWidth="1"
-                                opacity="0.3"
+                                strokeWidth={settings.strokeWidth}
+                                opacity={settings.opacity}
                                 fill="none"
                               />
                             );
@@ -688,27 +752,40 @@ export default function Test() {
                           });
                         })()}
                         
-                        {/* 얇은 선으로 모든 데이터 연결 (배경) */}
+                        {/* 🎯 적응형 배경 선 - 시간 범위에 따라 자동 조정 */}
                         {(() => {
                           const data = getSelectedSiteData();
                           if (data.length === 0) return null;
+                          
+                          const settings = getAdaptiveBackgroundLineSettings(timeRange);
+                          if (!settings.enabled) return null;
                           
                           const startTime = new Date(data[data.length - 1].createdAt);
                           const endTime = new Date(data[0].createdAt);
                           const totalTimeRange = endTime.getTime() - startTime.getTime();
                           
-                          return data.map((dataPoint, index) => {
+                          // 샘플링된 데이터 포인트 생성 (복잡성 감소)
+                          const sampledBackgroundData = [];
+                          for (let i = 0; i < data.length; i += settings.sampleInterval) {
+                            sampledBackgroundData.push(data[i]);
+                          }
+                          // 마지막 데이터 포인트 추가
+                          if (data.length > 0 && !sampledBackgroundData.includes(data[data.length - 1])) {
+                            sampledBackgroundData.push(data[data.length - 1]);
+                          }
+                          
+                          return sampledBackgroundData.map((dataPoint, index) => {
                             if (index === 0) return null;
                             
                             const currentTime = new Date(dataPoint.createdAt);
-                            const prevTime = new Date(data[index - 1].createdAt);
+                            const prevTime = new Date(sampledBackgroundData[index - 1].createdAt);
                             
                             // X축 위치 계산 (정석적인 방식: 왼쪽이 과거, 오른쪽이 현재)
                             const currentX = 50 + ((currentTime.getTime() - startTime.getTime()) / totalTimeRange) * 700;
                             const prevX = 50 + ((prevTime.getTime() - startTime.getTime()) / totalTimeRange) * 700;
                             
                             const currentY = 280 - (dataPoint.flowRate / 50) * 280;
-                            const prevY = 280 - (data[index - 1].flowRate / 50) * 280;
+                            const prevY = 280 - (sampledBackgroundData[index - 1].flowRate / 50) * 280;
                             
                             return (
                               <line
@@ -718,8 +795,8 @@ export default function Test() {
                                 x2={currentX}
                                 y2={currentY}
                                 stroke="#10b981"
-                                strokeWidth="1"
-                                opacity="0.3"
+                                strokeWidth={settings.strokeWidth}
+                                opacity={settings.opacity}
                                 fill="none"
                               />
                             );
