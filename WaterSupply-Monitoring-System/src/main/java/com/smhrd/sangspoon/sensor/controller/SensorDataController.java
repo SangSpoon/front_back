@@ -49,6 +49,13 @@ public class SensorDataController {
     @GetMapping("/data")
     public ResponseEntity<List<ParsedDataEntity>> getAllSensorData() {
         List<ParsedDataEntity> data = parsedDataRepository.findAllByOrderByCreatedAtDesc();
+        System.out.println("=== 센서 데이터 조회 로그 ===");
+        System.out.println("전체 데이터 수: " + data.size());
+        if (data.size() > 0) {
+            System.out.println("최신 데이터 시간: " + data.get(0).getCreatedAt());
+            System.out.println("가장 오래된 데이터 시간: " + data.get(data.size() - 1).getCreatedAt());
+        }
+        System.out.println("==========================");
         return ResponseEntity.ok(data);
     }
 

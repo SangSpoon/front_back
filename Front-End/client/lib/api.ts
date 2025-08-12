@@ -38,7 +38,6 @@ class ApiClient {
         'Content-Type': 'application/json',
         ...options.headers,
       },
-      credentials: 'include', // 세션 쿠키 포함
       signal: controller.signal,
       ...options,
     };

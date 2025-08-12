@@ -28,7 +28,7 @@ public class SiteEntity {
     private Status status;
 
     @ManyToOne
-    @JoinColumn(name = "member_id", nullable = false)
+    @JoinColumn(name = "member_id", nullable = true)
     private MemberEntity member;
 
     public enum Status {

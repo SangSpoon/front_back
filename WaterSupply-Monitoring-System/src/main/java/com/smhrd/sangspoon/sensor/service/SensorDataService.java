@@ -145,12 +145,15 @@ public class SensorDataService {
         if (hex == null || hex.length() == 0) {
             return false;
         }
-        try {
-            Integer.parseInt(hex, 16);
-            return true;
-        } catch (NumberFormatException e) {
-            return false;
+        
+        // 16진수 문자만 포함되어 있는지 확인
+        for (char c : hex.toCharArray()) {
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
+                return false;
+            }
         }
+        
+        return true;
     }
 
     // 누수량 계산 (상수도 관리 표준)

@@ -68,7 +68,7 @@ public class SensorDataScheduler {
             ParsedDataEntity parsedData = sensorDataService.parseRawData(rawData, siteId, sensorData.getId());
             parsedDataRepository.save(parsedData);
             
-            System.out.println("센서 데이터 생성 완료: " + LocalDateTime.now());
+            System.out.println("센서 데이터 생성 완료: " + LocalDateTime.now() + " (ID: " + parsedData.getId() + ")");
             
         } catch (Exception e) {
             System.err.println("센서 데이터 생성 실패: " + e.getMessage());
@@ -77,9 +77,15 @@ public class SensorDataScheduler {
     }
 
     private String generateRandomRawData() {
-        // 물탱크 수위 (이전 값 기반 점진적 변화)
-        float waterLevelChange = (random.nextFloat() - 0.5f) * 4.0f; // -2.0 ~ +2.0
-        float newWaterLevel = Math.max(20.0f, Math.min(90.0f, previousWaterLevel + waterLevelChange));
+        // 물탱크 수위 (이전 값 기반 점진적 변화) - 현실적인 범위로 조정
+        float waterLevelChange = (random.nextFloat() - 0.5f) * 3.0f; // -1.5 ~ +1.5
+        
+        // 기존 값이 너무 낮으면 강제로 높은 범위로 조정
+        if (previousWaterLevel < 50.0f) {
+            previousWaterLevel = 70.0f + (random.nextFloat() - 0.5f) * 10.0f; // 65-75 범위
+        }
+        
+        float newWaterLevel = Math.max(50.0f, Math.min(85.0f, previousWaterLevel + waterLevelChange));
         previousWaterLevel = newWaterLevel;
         String waterHex = String.format("%02x", Math.round(newWaterLevel));
         
@@ -99,8 +105,8 @@ public class SensorDataScheduler {
         int motorStatus = random.nextInt(4); // 0, 1, 2, 3
         String motorHex = String.format("%02x", motorStatus);
         
-        // 누적 총량 (점진적 증가)
-        cumulativeTotal += Math.round(newFlowRate * 60); // 분당 유량을 초당으로 변환하여 누적
+        // 누적 총량 (점진적 증가) - 분당 유량을 그대로 누적
+        cumulativeTotal += Math.round(newFlowRate);
         String totalAmountHex = String.format("%08x", cumulativeTotal);
         
         // Raw data 문자열 조합
@@ -141,10 +147,17 @@ public class SensorDataScheduler {
     public void start() {
         isRunning = true;
         // 이전 값들을 현실적인 초기값으로 리셋
-        previousWaterLevel = 50.0f + (random.nextFloat() - 0.5f) * 20.0f; // 40-60 범위
+        previousWaterLevel = 70.0f + (random.nextFloat() - 0.5f) * 15.0f; // 62.5-77.5 범위
         previousChemicalLevel = 40.0f + (random.nextFloat() - 0.5f) * 20.0f; // 30-50 범위
         previousFlowRate = 25.0f + (random.nextFloat() - 0.5f) * 10.0f; // 20-30 범위
+        
+        // cumulativeTotal 초기화
+        cumulativeTotal = 0;
+        
         System.out.println("센서 데이터 생성 시작됨");
+        System.out.println("초기 수위: " + previousWaterLevel + "%");
+        System.out.println("초기 약품: " + previousChemicalLevel + "%");
+        System.out.println("초기 유량: " + previousFlowRate + " L/min");
     }
 
     public void stop() {
@@ -154,5 +167,11 @@ public class SensorDataScheduler {
 
     public boolean isRunning() {
         return isRunning;
+    }
+    
+    // 강제로 높은 수위로 리셋
+    public void resetToHighWaterLevel() {
+        previousWaterLevel = 70.0f + (random.nextFloat() - 0.5f) * 15.0f; // 62.5-77.5 범위
+        System.out.println("수위 강제 리셋: " + previousWaterLevel + "%");
     }
 }

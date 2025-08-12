@@ -52,6 +52,30 @@ export default function Test() {
       const response = await fetch('http://localhost:8084/api/sensor/data');
       if (response.ok) {
         const data = await response.json();
+        console.log('센서 데이터 로드 완료:', data.length, '개');
+        console.log('데이터 시간 범위:', data.length > 0 ? {
+          최신: new Date(data[0].createdAt).toLocaleString(),
+          최고: new Date(data[data.length - 1].createdAt).toLocaleString()
+        } : '데이터 없음');
+        
+        // 데이터 샘플 로그 (처음 5개, 마지막 5개)
+        if (data.length > 0) {
+          console.log('처음 5개 데이터:', data.slice(0, 5).map(d => ({
+            id: d.id,
+            createdAt: new Date(d.createdAt).toLocaleString(),
+            waterLevel: d.waterLevel,
+            flowRate: d.flowRate
+          })));
+          if (data.length > 5) {
+            console.log('마지막 5개 데이터:', data.slice(-5).map(d => ({
+              id: d.id,
+              createdAt: new Date(d.createdAt).toLocaleString(),
+              waterLevel: d.waterLevel,
+              flowRate: d.flowRate
+            })));
+          }
+        }
+        
         setSensorData(data);
       }
     } catch (error) {
@@ -129,14 +153,25 @@ export default function Test() {
       .filter(data => data.siteId === selectedSite)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     
+    console.log('현장별 필터링 후:', filteredData.length, '개');
+    
     // 시간 범위에 따른 필터링
     const now = new Date();
     const timeRangeMs = getTimeRangeInMs(timeRange);
     const cutoffTime = new Date(now.getTime() - timeRangeMs);
     
+    console.log('시간 범위 필터링:', {
+      현재시간: now.toLocaleString(),
+      선택범위: timeRange,
+      시작시간: cutoffTime.toLocaleString(),
+      차이: Math.round(timeRangeMs / (1000 * 60 * 60)) + '시간'
+    });
+    
     filteredData = filteredData.filter(data => 
       new Date(data.createdAt) >= cutoffTime
     );
+    
+    console.log('시간 범위 필터링 후:', filteredData.length, '개');
     
     return filteredData;
   };
@@ -343,103 +378,170 @@ export default function Test() {
                         ({getTimeIntervalText(timeRange)} 간격)
                       </span>
                     </h3>
-                    <div className="h-52 relative">
-                      <svg className="w-full h-full" viewBox="0 0 800 220">
+                    <div className="h-80 relative">
+                      <svg className="w-full h-full" viewBox="0 0 800 320">
                         {/* Y축 눈금 */}
-                        <line x1="0" y1="0" x2="0" y2="180" stroke="#e5e7eb" strokeWidth="1" />
+                        <line x1="0" y1="0" x2="0" y2="280" stroke="#e5e7eb" strokeWidth="1" />
                         <line x1="0" y1="0" x2="800" y2="0" stroke="#e5e7eb" strokeWidth="1" />
-                        <line x1="0" y1="45" x2="800" y2="45" stroke="#e5e7eb" strokeWidth="0.5" />
-                        <line x1="0" y1="90" x2="800" y2="90" stroke="#e5e7eb" strokeWidth="0.5" />
-                        <line x1="0" y1="135" x2="800" y2="135" stroke="#e5e7eb" strokeWidth="0.5" />
+                        <line x1="0" y1="70" x2="800" y2="70" stroke="#e5e7eb" strokeWidth="0.5" />
+                        <line x1="0" y1="140" x2="800" y2="140" stroke="#e5e7eb" strokeWidth="0.5" />
+                        <line x1="0" y1="210" x2="800" y2="210" stroke="#e5e7eb" strokeWidth="0.5" />
                         
                         {/* Y축 라벨 */}
                         <text x="5" y="15" fontSize="12" fill="#6b7280">100%</text>
-                        <text x="5" y="60" fontSize="12" fill="#6b7280">75%</text>
-                        <text x="5" y="105" fontSize="12" fill="#6b7280">50%</text>
-                        <text x="5" y="150" fontSize="12" fill="#6b7280">25%</text>
+                        <text x="5" y="85" fontSize="12" fill="#6b7280">75%</text>
+                        <text x="5" y="155" fontSize="12" fill="#6b7280">50%</text>
+                        <text x="5" y="225" fontSize="12" fill="#6b7280">25%</text>
                         
-                        {/* 선그래프 - 최신 데이터가 오른쪽에 오도록 순서 조정 */}
-                        {getSelectedSiteData().slice(-20).reverse().map((data, index) => {
-                          const x = (index / 19) * 750 + 50;
-                          const y = 180 - (data.waterLevel / 100) * 180;
+                        {/* 선그래프 - 시간 간격에 따라 데이터 샘플링하여 표시 */}
+                        {(() => {
+                          const data = getSelectedSiteData();
+                          if (data.length === 0) return null;
                           
-                          if (index === 0) return null;
+                          // 시간 범위 계산
+                          const startTime = new Date(data[data.length - 1].createdAt); // 가장 오래된 데이터
+                          const endTime = new Date(data[0].createdAt); // 가장 최신 데이터
+                          const totalTimeRange = endTime.getTime() - startTime.getTime();
                           
-                          const prevData = getSelectedSiteData().slice(-20).reverse()[index - 1];
-                          const prevX = ((index - 1) / 19) * 750 + 50;
-                          const prevY = 180 - (prevData.waterLevel / 100) * 180;
+                          // 시간 간격에 따른 샘플링 간격 계산
+                          const interval = getTimeInterval(timeRange);
+                          const sampleInterval = Math.max(1, Math.floor(data.length / (totalTimeRange / interval)));
                           
-                          return (
-                            <g key={index}>
+                          // 샘플링된 데이터 포인트 생성
+                          const sampledData = [];
+                          for (let i = 0; i < data.length; i += sampleInterval) {
+                            sampledData.push(data[i]);
+                          }
+                          // 마지막 데이터 포인트 추가
+                          if (data.length > 0 && !sampledData.includes(data[data.length - 1])) {
+                            sampledData.push(data[data.length - 1]);
+                          }
+                          
+                          return sampledData.map((dataPoint, index) => {
+                            if (index === 0) return null;
+                            
+                            const currentTime = new Date(dataPoint.createdAt);
+                            const prevTime = new Date(sampledData[index - 1].createdAt);
+                            
+                            // X축 위치 계산 (정석적인 방식: 왼쪽이 과거, 오른쪽이 현재)
+                            const currentX = 50 + ((currentTime.getTime() - startTime.getTime()) / totalTimeRange) * 700;
+                            const prevX = 50 + ((prevTime.getTime() - startTime.getTime()) / totalTimeRange) * 700;
+                            
+                            const currentY = 280 - (dataPoint.waterLevel / 100) * 280;
+                            const prevY = 280 - (sampledData[index - 1].waterLevel / 100) * 280;
+                            
+                            return (
+                              <g key={index}>
+                                <line
+                                  x1={prevX}
+                                  y1={prevY}
+                                  x2={currentX}
+                                  y2={currentY}
+                                  stroke="#3b82f6"
+                                  strokeWidth="3"
+                                  fill="none"
+                                />
+                                <circle
+                                  cx={currentX}
+                                  cy={currentY}
+                                  r="4"
+                                  fill="#3b82f6"
+                                />
+                              </g>
+                            );
+                          });
+                        })()}
+                        
+                        {/* 얇은 선으로 모든 데이터 연결 (배경) */}
+                        {(() => {
+                          const data = getSelectedSiteData();
+                          if (data.length === 0) return null;
+                          
+                          const startTime = new Date(data[data.length - 1].createdAt);
+                          const endTime = new Date(data[0].createdAt);
+                          const totalTimeRange = endTime.getTime() - startTime.getTime();
+                          
+                          return data.map((dataPoint, index) => {
+                            if (index === 0) return null;
+                            
+                            const currentTime = new Date(dataPoint.createdAt);
+                            const prevTime = new Date(data[index - 1].createdAt);
+                            
+                            // X축 위치 계산 (정석적인 방식: 왼쪽이 과거, 오른쪽이 현재)
+                            const currentX = 50 + ((currentTime.getTime() - startTime.getTime()) / totalTimeRange) * 700;
+                            const prevX = 50 + ((prevTime.getTime() - startTime.getTime()) / totalTimeRange) * 700;
+                            
+                            const currentY = 280 - (dataPoint.waterLevel / 100) * 280;
+                            const prevY = 280 - (data[index - 1].waterLevel / 100) * 280;
+                            
+                            return (
                               <line
+                                key={`bg-${index}`}
                                 x1={prevX}
                                 y1={prevY}
-                                x2={x}
-                                y2={y}
+                                x2={currentX}
+                                y2={currentY}
                                 stroke="#3b82f6"
-                                strokeWidth="3"
+                                strokeWidth="1"
+                                opacity="0.3"
                                 fill="none"
                               />
-                              <circle
-                                cx={x}
-                                cy={y}
-                                r="4"
-                                fill="#3b82f6"
-                              />
-                            </g>
-                          );
-                        })}
+                            );
+                          });
+                        })()}
                         
                         {/* 첫 번째 점도 표시 */}
-                        {getSelectedSiteData().slice(-20).reverse().map((data, index) => {
-                          if (index !== 0) return null;
-                          const x = (index / 19) * 750 + 50;
-                          const y = 180 - (data.waterLevel / 100) * 180;
+                        {(() => {
+                          const data = getSelectedSiteData();
+                          if (data.length === 0) return null;
+                          
+                          const startTime = new Date(data[data.length - 1].createdAt);
+                          const endTime = new Date(data[0].createdAt);
+                          const totalTimeRange = endTime.getTime() - startTime.getTime();
+                          
+                          const firstData = data[data.length - 1]; // 가장 오래된 데이터
+                          const firstX = 50 + ((startTime.getTime() - startTime.getTime()) / totalTimeRange) * 700; // 50
+                          const firstY = 280 - (firstData.waterLevel / 100) * 280;
                           
                           return (
                             <circle
-                              key={`first-${index}`}
-                              cx={x}
-                              cy={y}
-                              r="4"
+                              cx={firstX}
+                              cy={firstY}
+                              r="3"
                               fill="#3b82f6"
                             />
                           );
-                        })}
+                        })()}
                         
-                        {/* X축 시간 라벨 - 최신 데이터가 오른쪽에 오도록 순서 조정 */}
-                        {getSelectedSiteData().slice(-20).reverse().map((data, index) => {
-                          if (index % 3 !== 0) return null;
-                          const x = (index / 19) * 750 + 50;
-                          
-                          return (
-                            <text key={`time-${index}`} x={x} y="195" fontSize="10" fill="#6b7280" textAnchor="middle">
-                              {new Date(data.createdAt).toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}
-                            </text>
-                          );
-                        })}
-                        
-                        {/* 동적 간격 시간 표시 */}
+                        {/* X축 시간 라벨 - 동적 간격 시간 표시만 사용 */}
                         {(() => {
-                          const data = getSelectedSiteData().slice(-20).reverse();
+                          const data = getSelectedSiteData();
                           if (data.length === 0) return null;
                           
-                          const startTime = new Date(data[0].createdAt);
-                          const endTime = new Date(data[data.length - 1].createdAt);
+                          const startTime = new Date(data[data.length - 1].createdAt);
+                          const endTime = new Date(data[0].createdAt);
                           const interval = getTimeInterval(timeRange);
                           
                           const timePoints = [];
                           let currentTime = new Date(startTime);
                           
+                          // 시작 시간을 간격에 맞게 조정
                           if (interval <= 60 * 60 * 1000) {
-                            currentTime.setMinutes(Math.floor(currentTime.getMinutes() / (interval / (60 * 1000))) * (interval / (60 * 1000)), 0, 0);
+                            // 분 단위 간격
+                            const minutes = Math.floor(currentTime.getMinutes() / (interval / (60 * 1000))) * (interval / (60 * 1000));
+                            currentTime.setMinutes(minutes, 0, 0);
                           } else if (interval <= 24 * 60 * 60 * 1000) {
-                            currentTime.setHours(Math.floor(currentTime.getHours() / (interval / (60 * 60 * 1000))) * (interval / (60 * 60 * 1000)), 0, 0, 0);
+                            // 시간 단위 간격
+                            const hours = Math.floor(currentTime.getHours() / (interval / (60 * 60 * 1000))) * (interval / (60 * 60 * 1000));
+                            currentTime.setHours(hours, 0, 0, 0);
                           } else {
-                            currentTime.setDate(Math.floor(currentTime.getDate() / (interval / (24 * 60 * 60 * 1000))) * (interval / (24 * 60 * 60 * 1000)));
+                            // 일 단위 간격
+                            const days = Math.floor(currentTime.getDate() / (interval / (24 * 60 * 60 * 1000))) * (interval / (24 * 60 * 60 * 1000));
+                            currentTime.setDate(days);
                             currentTime.setHours(0, 0, 0, 0);
                           }
                           
+                          // 간격에 맞는 시간 포인트 생성
                           while (currentTime <= endTime) {
                             timePoints.push(new Date(currentTime));
                             if (interval <= 60 * 60 * 1000) {
@@ -452,6 +554,7 @@ export default function Test() {
                           }
                           
                           return timePoints.map((time, timeIndex) => {
+                            // 데이터에서 가장 가까운 시간 찾기
                             let closestIndex = 0;
                             let minDiff = Infinity;
                             
@@ -464,20 +567,31 @@ export default function Test() {
                               }
                             });
                             
+                            // 간격의 절반 이내에 있는 데이터만 표시
                             if (minDiff <= interval / 2) {
-                              const x = (closestIndex / 19) * 750 + 50;
+                              const dataPoint = data[closestIndex];
+                              const currentTime = new Date(dataPoint.createdAt);
+                              const startTime = new Date(data[data.length - 1].createdAt);
+                              const endTime = new Date(data[0].createdAt);
+                              const totalTimeRange = endTime.getTime() - startTime.getTime();
+                              
+                              // X축 위치 계산 (정석적인 방식: 왼쪽이 과거, 오른쪽이 현재)
+                              const x = 50 + ((currentTime.getTime() - startTime.getTime()) / totalTimeRange) * 700;
+                              
                               return (
                                 <g key={`interval-${timeIndex}`}>
+                                  {/* 수직 점선 */}
                                   <line 
-                                    x1={x} y1="0" x2={x} y2="180" 
+                                    x1={x} y1="0" x2={x} y2="280" 
                                     stroke="#e5e7eb" 
                                     strokeWidth="1" 
                                     strokeDasharray="2,2"
                                   />
+                                  {/* 시간 라벨 */}
                                   <text 
-                                    x={x} y="210" 
-                                    fontSize="9" 
-                                    fill="#9ca3af" 
+                                    x={x} y="300" 
+                                    fontSize="10" 
+                                    fill="#6b7280" 
                                     textAnchor="middle"
                                   >
                                     {time.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}
@@ -500,85 +614,144 @@ export default function Test() {
                         ({getTimeIntervalText(timeRange)} 간격)
                       </span>
                     </h3>
-                    <div className="h-52 relative">
-                      <svg className="w-full h-full" viewBox="0 0 800 220">
+                    <div className="h-80 relative">
+                      <svg className="w-full h-full" viewBox="0 0 800 320">
                         {/* Y축 눈금 */}
-                        <line x1="0" y1="0" x2="0" y2="180" stroke="#e5e7eb" strokeWidth="1" />
+                        <line x1="0" y1="0" x2="0" y2="280" stroke="#e5e7eb" strokeWidth="1" />
                         <line x1="0" y1="0" x2="800" y2="0" stroke="#e5e7eb" strokeWidth="1" />
-                        <line x1="0" y1="45" x2="800" y2="45" stroke="#e5e7eb" strokeWidth="0.5" />
-                        <line x1="0" y1="90" x2="800" y2="90" stroke="#e5e7eb" strokeWidth="0.5" />
-                        <line x1="0" y1="135" x2="800" y2="135" stroke="#e5e7eb" strokeWidth="0.5" />
+                        <line x1="0" y1="70" x2="800" y2="70" stroke="#e5e7eb" strokeWidth="0.5" />
+                        <line x1="0" y1="140" x2="800" y2="140" stroke="#e5e7eb" strokeWidth="0.5" />
+                        <line x1="0" y1="210" x2="800" y2="210" stroke="#e5e7eb" strokeWidth="0.5" />
                         
                         {/* Y축 라벨 */}
-                        <text x="5" y="15" fontSize="12" fill="#6b7280">16 L/min</text>
-                        <text x="5" y="60" fontSize="12" fill="#6b7280">12 L/min</text>
-                        <text x="5" y="105" fontSize="12" fill="#6b7280">8 L/min</text>
-                        <text x="5" y="150" fontSize="12" fill="#6b7280">4 L/min</text>
+                        <text x="5" y="15" fontSize="12" fill="#6b7280">50 L/min</text>
+                        <text x="5" y="85" fontSize="12" fill="#6b7280">37.5 L/min</text>
+                        <text x="5" y="155" fontSize="12" fill="#6b7280">25 L/min</text>
+                        <text x="5" y="225" fontSize="12" fill="#6b7280">12.5 L/min</text>
                         
-                        {/* 선그래프 */}
-                        {getSelectedSiteData().slice(-20).map((data, index) => {
-                          const x = (index / 19) * 750 + 50;
-                          const y = 180 - (data.flowRate / 16) * 180;
+                        {/* 선그래프 - 시간 간격에 따라 데이터 샘플링하여 표시 */}
+                        {(() => {
+                          const data = getSelectedSiteData();
+                          if (data.length === 0) return null;
                           
-                          if (index === 0) return null;
+                          // 시간 범위 계산
+                          const startTime = new Date(data[data.length - 1].createdAt); // 가장 오래된 데이터
+                          const endTime = new Date(data[0].createdAt); // 가장 최신 데이터
+                          const totalTimeRange = endTime.getTime() - startTime.getTime();
                           
-                          const prevData = getSelectedSiteData().slice(-20)[index - 1];
-                          const prevX = ((index - 1) / 19) * 750 + 50;
-                          const prevY = 180 - (prevData.flowRate / 16) * 180;
+                          // 시간 간격에 따른 샘플링 간격 계산
+                          const interval = getTimeInterval(timeRange);
+                          const sampleInterval = Math.max(1, Math.floor(data.length / (totalTimeRange / interval)));
                           
-                          return (
-                            <g key={index}>
+                          // 샘플링된 데이터 포인트 생성
+                          const sampledData = [];
+                          for (let i = 0; i < data.length; i += sampleInterval) {
+                            sampledData.push(data[i]);
+                          }
+                          // 마지막 데이터 포인트 추가
+                          if (data.length > 0 && !sampledData.includes(data[data.length - 1])) {
+                            sampledData.push(data[data.length - 1]);
+                          }
+                          
+                          return sampledData.map((dataPoint, index) => {
+                            if (index === 0) return null;
+                            
+                            const currentTime = new Date(dataPoint.createdAt);
+                            const prevTime = new Date(sampledData[index - 1].createdAt);
+                            
+                            // X축 위치 계산 (정석적인 방식: 왼쪽이 과거, 오른쪽이 현재)
+                            const currentX = 50 + ((currentTime.getTime() - startTime.getTime()) / totalTimeRange) * 700;
+                            const prevX = 50 + ((prevTime.getTime() - startTime.getTime()) / totalTimeRange) * 700;
+                            
+                            const currentY = 280 - (dataPoint.flowRate / 50) * 280;
+                            const prevY = 280 - (sampledData[index - 1].flowRate / 50) * 280;
+                            
+                            return (
+                              <g key={index}>
+                                <line
+                                  x1={prevX}
+                                  y1={prevY}
+                                  x2={currentX}
+                                  y2={currentY}
+                                  stroke="#10b981"
+                                  strokeWidth="3"
+                                  fill="none"
+                                />
+                                <circle
+                                  cx={currentX}
+                                  cy={currentY}
+                                  r="4"
+                                  fill="#10b981"
+                                />
+                              </g>
+                            );
+                          });
+                        })()}
+                        
+                        {/* 얇은 선으로 모든 데이터 연결 (배경) */}
+                        {(() => {
+                          const data = getSelectedSiteData();
+                          if (data.length === 0) return null;
+                          
+                          const startTime = new Date(data[data.length - 1].createdAt);
+                          const endTime = new Date(data[0].createdAt);
+                          const totalTimeRange = endTime.getTime() - startTime.getTime();
+                          
+                          return data.map((dataPoint, index) => {
+                            if (index === 0) return null;
+                            
+                            const currentTime = new Date(dataPoint.createdAt);
+                            const prevTime = new Date(data[index - 1].createdAt);
+                            
+                            // X축 위치 계산 (정석적인 방식: 왼쪽이 과거, 오른쪽이 현재)
+                            const currentX = 50 + ((currentTime.getTime() - startTime.getTime()) / totalTimeRange) * 700;
+                            const prevX = 50 + ((prevTime.getTime() - startTime.getTime()) / totalTimeRange) * 700;
+                            
+                            const currentY = 280 - (dataPoint.flowRate / 50) * 280;
+                            const prevY = 280 - (data[index - 1].flowRate / 50) * 280;
+                            
+                            return (
                               <line
+                                key={`bg-flow-${index}`}
                                 x1={prevX}
                                 y1={prevY}
-                                x2={x}
-                                y2={y}
+                                x2={currentX}
+                                y2={currentY}
                                 stroke="#10b981"
-                                strokeWidth="3"
+                                strokeWidth="1"
+                                opacity="0.3"
                                 fill="none"
                               />
-                              <circle
-                                cx={x}
-                                cy={y}
-                                r="4"
-                                fill="#10b981"
-                              />
-                            </g>
-                          );
-                        })}
+                            );
+                          });
+                        })()}
                         
                         {/* 첫 번째 점도 표시 */}
-                        {getSelectedSiteData().slice(-20).map((data, index) => {
-                          if (index !== 0) return null;
-                          const x = (index / 19) * 750 + 50;
-                          const y = 180 - (data.flowRate / 16) * 180;
+                        {(() => {
+                          const data = getSelectedSiteData();
+                          if (data.length === 0) return null;
+                          
+                          const startTime = new Date(data[data.length - 1].createdAt);
+                          const endTime = new Date(data[0].createdAt);
+                          const totalTimeRange = endTime.getTime() - startTime.getTime();
+                          
+                          const firstData = data[data.length - 1]; // 가장 오래된 데이터
+                          const firstX = 50 + ((startTime.getTime() - startTime.getTime()) / totalTimeRange) * 700; // 50
+                          const firstY = 280 - (firstData.flowRate / 50) * 280;
                           
                           return (
                             <circle
-                              key={`first-${index}`}
-                              cx={x}
-                              cy={y}
-                              r="4"
+                              cx={firstX}
+                              cy={firstY}
+                              r="3"
                               fill="#10b981"
                             />
                           );
-                        })}
+                        })()}
                         
-                        {/* X축 시간 라벨 */}
-                        {getSelectedSiteData().slice(-20).map((data, index) => {
-                          if (index % 3 !== 0) return null;
-                          const x = (index / 19) * 750 + 50;
-                          
-                          return (
-                            <text key={`time-${index}`} x={x} y="195" fontSize="10" fill="#6b7280" textAnchor="middle">
-                              {new Date(data.createdAt).toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}
-                            </text>
-                          );
-                        })}
-                        
-                        {/* 동적 간격 시간 표시 */}
+                        {/* X축 시간 라벨 - 동적 간격 시간 표시만 사용 */}
                         {(() => {
-                          const data = getSelectedSiteData().slice(-20);
+                          const data = getSelectedSiteData();
                           if (data.length === 0) return null;
                           
                           const startTime = new Date(data[data.length - 1].createdAt);
@@ -622,19 +795,28 @@ export default function Test() {
                             });
                             
                             if (minDiff <= interval / 2) {
-                              const x = (closestIndex / 19) * 750 + 50;
+                              const dataPoint = data[closestIndex];
+                              const currentTime = new Date(dataPoint.createdAt);
+                              const startTime = new Date(data[data.length - 1].createdAt);
+                              const endTime = new Date(data[0].createdAt);
+                              const totalTimeRange = endTime.getTime() - startTime.getTime();
+                              
+                              const x = 50 + ((currentTime.getTime() - startTime.getTime()) / totalTimeRange) * 700;
+                              
                               return (
                                 <g key={`interval-flow-${timeIndex}`}>
+                                  {/* 수직 점선 */}
                                   <line 
-                                    x1={x} y1="0" x2={x} y2="180" 
+                                    x1={x} y1="0" x2={x} y2="280" 
                                     stroke="#e5e7eb" 
                                     strokeWidth="1" 
                                     strokeDasharray="2,2"
                                   />
+                                  {/* 시간 라벨 */}
                                   <text 
-                                    x={x} y="210" 
-                                    fontSize="9" 
-                                    fill="#9ca3af" 
+                                    x={x} y="300" 
+                                    fontSize="10" 
+                                    fill="#6b7280" 
                                     textAnchor="middle"
                                   >
                                     {time.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}
