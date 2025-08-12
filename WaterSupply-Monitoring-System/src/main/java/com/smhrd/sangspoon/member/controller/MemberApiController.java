@@ -3,6 +3,7 @@ package com.smhrd.sangspoon.member.controller;
 import com.smhrd.sangspoon.member.entity.MemberEntity;
 import com.smhrd.sangspoon.member.service.MemberService;
 import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -57,7 +58,8 @@ public class MemberApiController {
     // 로그인 API
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> loginRequest,
-                                                     HttpSession session) {
+                                                     HttpSession session,
+                                                     HttpServletRequest request) {
         Map<String, Object> response = new HashMap<>();
         
         String loginId = loginRequest.get("loginId");
@@ -66,7 +68,10 @@ public class MemberApiController {
         MemberEntity member = memberService.login(loginId, password);
         
         if (member != null) {
-            session.setAttribute("loginMember", member);
+            // 항상 새 세션을 발급하여 이전 로그인 상태와 혼동 방지
+            try { session.invalidate(); } catch (IllegalStateException ignore) {}
+            HttpSession newSession = request.getSession(true);
+            newSession.setAttribute("loginMember", member);
             response.put("success", true);
             response.put("message", "로그인 성공");
             response.put("member", member);

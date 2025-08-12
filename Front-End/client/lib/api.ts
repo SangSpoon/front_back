@@ -22,6 +22,36 @@ interface RegisterRequest {
   confirmPassword: string; // 비밀번호 확인
 }
 
+// Site DTOs
+export interface CreateOrUpdateSiteRequest {
+  managementCode: string;
+  siteName: string;
+  contactNumber: string;
+  manager?: string;
+  tankType: string; // "circular" | "square" 등
+  length: number;
+  width: number;
+  height: number;
+  status: string; // active | inactive | maintenance
+  memberId?: number | null;
+}
+
+export interface SiteResponse {
+  managementCode: string;
+  siteName: string;
+  contactNumber: string;
+  manager?: string | null;
+  tankType: string;
+  length: number;
+  width: number;
+  height: number;
+  status: string;
+  calculatedVolume?: number;
+  memberId?: number | null;
+  memberName?: string | null;
+  memberLoginId?: string | null;
+}
+
 class ApiClient {
   private async request<T>(
     endpoint: string,
@@ -38,6 +68,7 @@ class ApiClient {
         'Content-Type': 'application/json',
         ...options.headers,
       },
+      credentials: 'include',
       signal: controller.signal,
       ...options,
     };
@@ -103,6 +134,39 @@ class ApiClient {
     return this.request('/member/register', {
       method: 'POST',
       body: JSON.stringify(memberData),
+    });
+  }
+
+  // 사이트 생성
+  async createSite(payload: CreateOrUpdateSiteRequest): Promise<ApiResponse<SiteResponse>> {
+    return this.request('/sites', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // 사이트 목록
+  async listSites(): Promise<ApiResponse<SiteResponse[]>> {
+    return this.request('/sites', { method: 'GET' });
+  }
+
+  // 사이트 단건 조회
+  async getSite(managementCode: string): Promise<ApiResponse<SiteResponse>> {
+    return this.request(`/sites/${encodeURIComponent(managementCode)}`, { method: 'GET' });
+  }
+
+  // 사이트 수정
+  async updateSite(managementCode: string, payload: Partial<CreateOrUpdateSiteRequest>): Promise<ApiResponse<SiteResponse>> {
+    return this.request(`/sites/${encodeURIComponent(managementCode)}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // 사이트 삭제
+  async deleteSite(managementCode: string): Promise<ApiResponse<any>> {
+    return this.request(`/sites/${encodeURIComponent(managementCode)}`, {
+      method: 'DELETE',
     });
   }
 

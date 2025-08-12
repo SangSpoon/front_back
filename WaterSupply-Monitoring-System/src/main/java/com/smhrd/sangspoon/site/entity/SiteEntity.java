@@ -20,6 +20,7 @@ public class SiteEntity {
 
     private String siteName;
     private String contactNumber;
+    private String manager; // 담당자 이름 -> DB 컬럼 'manager'
     private String tankType; // VARCHAR로 변경
     private double length; // 가로
     private double width; // 세로
@@ -32,7 +33,9 @@ public class SiteEntity {
     private MemberEntity member;
 
     public enum Status {
-        ACTIVE, INACTIVE // 활성, 비활성
+        ACTIVE,        // 활성
+        INACTIVE,      // 비활성
+        MAINTENANCE    // 점검중
     }
 
     // 부피 계산 메서드

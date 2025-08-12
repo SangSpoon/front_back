@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,8 @@ import {
   Gauge,
   ArrowLeft
 } from "lucide-react";
+import { apiClient, type CreateOrUpdateSiteRequest, type SiteResponse } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 interface Site {
   id: string;
@@ -37,57 +39,34 @@ interface Site {
   status: "active" | "inactive" | "maintenance";
 }
 
-// Sample data
-const sampleSites: Site[] = [
-  {
-    id: "1",
-    name: "현장 A",
-    managementNumber: "RSA-001",
-    contactPerson: "김철수",
-    contactPhone: "+82-10-1234-5678",
-    tankType: "circular",
-    width: 25,
-    length: 25,
-    height: 15,
-    volume: 7363,
-    flowRate: 245.5,
-    total: 15420.8,
-    status: "active"
-  },
-  {
-    id: "2",
-    name: "현장 B",
-    managementNumber: "PSB-002",
-    contactPerson: "이영희",
-    contactPhone: "+82-10-2345-6789",
-    tankType: "square",
-    width: 20,
-    length: 30,
-    height: 12,
-    volume: 7200,
-    flowRate: 320.8,
-    total: 28934.2,
-    status: "active"
-  },
-  {
-    id: "3",
-    name: "현장 C",
-    managementNumber: "TPC-003",
-    contactPerson: "박민수",
-    contactPhone: "+82-10-3456-7890",
-    tankType: "circular",
-    width: 35,
-    length: 35,
-    height: 18,
-    volume: 17279,
-    flowRate: 180.3,
-    total: 45621.7,
-    status: "maintenance"
-  }
-];
+// 서버 응답을 UI 타입으로 매핑
+function mapSite(resp: SiteResponse): Site {
+  const tankType = resp.tankType?.toLowerCase() === "circle" ? "circular" : resp.tankType?.toLowerCase() === "square" ? "square" : "circular";
+  const status = resp.status?.toLowerCase() === "inactive"
+    ? "inactive"
+    : resp.status?.toLowerCase() === "maintenance"
+    ? "maintenance"
+    : "active";
+  return {
+    id: resp.managementCode,
+    name: resp.siteName,
+    managementNumber: resp.managementCode,
+    contactPerson: resp.manager || resp.memberName || "",
+    contactPhone: resp.contactNumber || "",
+    tankType,
+    width: resp.width || 0,
+    length: resp.length || 0,
+    height: resp.height || 0,
+    volume: typeof resp.calculatedVolume === "number" ? resp.calculatedVolume : 0,
+    flowRate: 0,
+    total: 0,
+    status,
+  };
+}
 
 export default function SiteManagement() {
-  const [sites, setSites] = useState<Site[]>(sampleSites);
+  const { toast } = useToast();
+  const [sites, setSites] = useState<Site[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingSite, setEditingSite] = useState<Site | null>(null);
@@ -191,35 +170,69 @@ export default function SiteManagement() {
     setFormData(prev => ({ ...prev, status: value as "active" | "inactive" | "maintenance" }));
   }, []);
 
-  const handleSubmit = () => {
-    if (editingSite) {
-      setSites(prev => prev.map(site => 
-        site.id === editingSite.id ? { ...site, ...formData } : site
-      ));
-      setEditingSite(null);
-    } else {
-      const newSite: Site = {
-        ...formData,
-        id: Date.now().toString(),
-        volume: formData.volume || 0,
-        flowRate: 0,
-        total: 0,
-      } as Site;
-      setSites(prev => [...prev, newSite]);
+  const loadSites = useCallback(async () => {
+    try {
+      const res = await apiClient.listSites();
+      if (res.success && Array.isArray(res.data)) {
+        setSites(res.data.map(mapSite));
+      }
+    } catch (e: any) {
+      toast({ title: "사이트 목록 로딩 실패", description: e.message, variant: "destructive" });
     }
-    
-    setFormData({
-      name: "",
-      managementNumber: "",
-      contactPerson: "",
-      contactPhone: "",
-      tankType: "circular",
-      width: 0,
-      length: 0,
-      height: 0,
-      status: "active"
-    });
-    setIsAddDialogOpen(false);
+  }, [toast]);
+
+  useEffect(() => {
+    loadSites();
+  }, [loadSites]);
+
+  const handleSubmit = async () => {
+    try {
+      if (editingSite) {
+        const payload: Partial<CreateOrUpdateSiteRequest> = {
+          siteName: formData.name!,
+          contactNumber: formData.contactPhone!,
+          manager: formData.contactPerson || undefined,
+          tankType: formData.tankType!,
+          length: formData.tankType === "square" ? formData.length || 0 : 0,
+          width: formData.width || 0,
+          height: formData.height || 0,
+          status: formData.status!,
+        };
+        await apiClient.updateSite(editingSite.managementNumber, payload);
+        toast({ title: "사이트 수정 완료" });
+        setEditingSite(null);
+      } else {
+        const payload: CreateOrUpdateSiteRequest = {
+          managementCode: formData.managementNumber!,
+          siteName: formData.name!,
+          contactNumber: formData.contactPhone!,
+          manager: formData.contactPerson || undefined,
+          tankType: formData.tankType!,
+          length: formData.tankType === "square" ? formData.length || 0 : 0,
+          width: formData.width || 0,
+          height: formData.height || 0,
+          status: formData.status!,
+          memberId: null,
+        };
+        await apiClient.createSite(payload);
+        toast({ title: "사이트가 추가되었습니다." });
+      }
+      await loadSites();
+      setFormData({
+        name: "",
+        managementNumber: "",
+        contactPerson: "",
+        contactPhone: "",
+        tankType: "circular",
+        width: 0,
+        length: 0,
+        height: 0,
+        status: "active"
+      });
+      setIsAddDialogOpen(false);
+    } catch (e: any) {
+      toast({ title: "저장 실패", description: e.message, variant: "destructive" });
+    }
   };
 
   const handleEdit = (site: Site) => {
@@ -228,8 +241,14 @@ export default function SiteManagement() {
     setIsAddDialogOpen(true);
   };
 
-  const handleDelete = (siteId: string) => {
-    setSites(prev => prev.filter(site => site.id !== siteId));
+  const handleDelete = async (siteId: string) => {
+    try {
+      await apiClient.deleteSite(siteId);
+      toast({ title: "삭제되었습니다." });
+      await loadSites();
+    } catch (e: any) {
+      toast({ title: "삭제 실패", description: e.message, variant: "destructive" });
+    }
   };
 
   const getStatusBadge = (status: string) => {
