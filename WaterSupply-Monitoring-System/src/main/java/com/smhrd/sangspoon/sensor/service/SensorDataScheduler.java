@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Random;
 
 @Service
@@ -53,44 +54,47 @@ public class SensorDataScheduler {
             LocalDateTime now = LocalDateTime.now();
             LocalDateTime currentMinuteStart = now.withSecond(0).withNano(0);
             LocalDateTime nextMinuteStart = currentMinuteStart.plusMinutes(1);
-            
-            boolean dataExists = parsedDataRepository.existsBySiteIdAndCreatedAtBetween(
-                "001000", currentMinuteStart, nextMinuteStart
-            );
-            
-            if (dataExists) {
-                System.out.println("이미 데이터가 존재합니다. 생성하지 않습니다. (" + now + ")");
-                return; // 중복 방지!
+
+            List<String> siteIds = siteRepository.findAllManagementCodes();
+
+            if (siteIds.isEmpty()) {
+                System.out.println("관리번호가 없습니다. 생성 중단.");
+            }
+
+            for (String siteId : siteIds) {
+                boolean dataExists = parsedDataRepository.existsBySiteIdAndCreatedAtBetween(siteId, currentMinuteStart, nextMinuteStart);
+
+                if (dataExists) {
+                    // managementCode 출력만 제거함
+                    System.out.println("이미 데이터 존재합니다.");
+                    continue;
+                }
+
+                SiteEntity site = siteRepository.getReferenceById(siteId);
+
+                String rawData = generateRandomRawData(siteId);
+
+                SensorDataEntity sensorData = new SensorDataEntity();
+                sensorData.setRawData(rawData);
+                sensorData.setReceivedAt(LocalDateTime.now());
+                sensorData.setSite(site);
+                sensorDataRepository.save(sensorData);
+
+                ParsedDataEntity parsedData = sensorDataService.parseRawData(rawData, siteId, sensorData.getId());
+                parsedDataRepository.save(parsedData);
+
+                System.out.println("센서 데이터 생성 완료: " + LocalDateTime.now()
+                        + " (siteId: " + siteId + ", parsedId: " + parsedData.getId() + ")");
             }
             
-            // 현장 정보 가져오기 (관리번호 "001000")
-            SiteEntity site = siteRepository.findById("001000")
-                .orElse(null); // null 허용
-            
-            // 랜덤 raw data 생성
-            String rawData = generateRandomRawData();
-            
-            // SensorDataEntity 생성 및 저장
-            SensorDataEntity sensorData = new SensorDataEntity();
-            sensorData.setRawData(rawData);
-            sensorData.setReceivedAt(LocalDateTime.now());
-            sensorData.setSite(site); // site가 null이어도 저장
-            sensorDataRepository.save(sensorData); // 항상 저장하여 ID 생성
-            
-            // raw data 파싱하여 ParsedDataEntity 생성
-            String siteId = site != null ? site.getManagementCode() : "001000";
-            ParsedDataEntity parsedData = sensorDataService.parseRawData(rawData, siteId, sensorData.getId());
-            parsedDataRepository.save(parsedData);
-            
-            System.out.println("센서 데이터 생성 완료: " + LocalDateTime.now() + " (ID: " + parsedData.getId() + ")");
-            
+
         } catch (Exception e) {
             System.err.println("센서 데이터 생성 실패: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    private String generateRandomRawData() {
+    private String generateRandomRawData(String siteId) {
         // 물탱크 수위 (이전 값 기반 점진적 변화) - 현실적인 범위로 조정
         float waterLevelChange = (random.nextFloat() - 0.5f) * 3.0f; // -1.5 ~ +1.5
         
@@ -124,8 +128,8 @@ public class SensorDataScheduler {
         String totalAmountHex = String.format("%08x", cumulativeTotal);
         
         // Raw data 문자열 조합
-        String rawData = String.format("001000WATER%sCHEMICAL%sMAIN%s%s%s", 
-            waterHex, chemicalHex, motorHex, flowRateHex, totalAmountHex);
+        String rawData = String.format("%sWATER%sCHEMICAL%sMAIN%s%s%s",
+           siteId, waterHex, chemicalHex, motorHex, flowRateHex, totalAmountHex);
         
         // 디버깅을 위한 로그
         System.out.println("Generated Raw Data: " + rawData);
