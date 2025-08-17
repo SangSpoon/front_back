@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +17,11 @@ import {
   Phone,
   Activity,
   Gauge,
-  ArrowLeft
+  ArrowLeft,
+  TrendingUp,
+  Zap,
+  Droplets,
+  X
 } from "lucide-react";
 import { apiClient, type CreateOrUpdateSiteRequest, type SiteResponse } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +40,18 @@ interface Site {
   flowRate: number;
   total: number;
   status: "active" | "inactive" | "maintenance";
+}
+
+interface SensorData {
+  id: number;
+  waterLevel: number;
+  chemicalLevel: number;
+  motorStatus1: number;
+  motorStatus2: number;
+  flowRate: number;
+  totalAmount: number;
+  createdAt: string;
+  siteId: string;
 }
 
 // 서버 응답을 UI 타입으로 매핑
@@ -63,12 +79,394 @@ function mapSite(resp: SiteResponse): Site {
   };
 }
 
+// 좌측 그래프 컴포넌트 (선택된 현장 24시간 수위/유량 그래프)
+function SiteGraphs({ selectedSite, sensorData, onClose }: { selectedSite: Site | null; sensorData: SensorData[]; onClose: () => void }) {
+  if (!selectedSite) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-500">
+        <div className="text-center">
+          <MapPin className="h-16 w-16 mx-auto mb-3 text-gray-300" />
+          <p className="text-base">현장을 선택하세요</p>
+          <p className="text-sm">오른쪽 목록에서 행을 클릭하면</p>
+          <p className="text-sm">여기에 24시간 그래프가 표시됩니다</p>
+        </div>
+      </div>
+    );
+  }
+
+  const siteData = sensorData
+    .filter(d => d.siteId === selectedSite.id)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  const now = new Date().getTime();
+  const recentData = siteData.filter(d => now - new Date(d.createdAt).getTime() <= 24 * 60 * 60 * 1000);
+
+  const maxFlowRate = Math.max(1, ...recentData.map(d => d.flowRate));
+
+  // 24시간 고정 간격 설정
+  const timeRangeMs = 24 * 60 * 60 * 1000;
+  const intervalMs = 2 * 60 * 60 * 1000; // 2시간 간격
+
+  return (
+    <div className="space-y-4">
+      {/* 헤더 */}
+      <div className="bg-white p-4 rounded-lg border">
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">{selectedSite.name}</h2>
+            <div className="text-sm text-gray-600">관리번호: {selectedSite.managementNumber}</div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="ml-2 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+            aria-label="그래프 닫기"
+          >
+            <X className="h-4 w-4" />
+            닫기
+          </button>
+        </div>
+      </div>
+
+      {/* 수위 그래프 */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center justify-between text-sm">
+            <span className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-blue-500" />
+              24시간 수위 변화 (%)
+            </span>
+            <span className="text-xs text-gray-500">(2시간 간격)</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64 relative">
+            {recentData.length > 1 ? (
+              <svg className="w-full h-full" viewBox="0 0 800 320">
+                {/* 축/눈금 */}
+                <line x1="0" y1="0" x2="0" y2="280" stroke="#e5e7eb" strokeWidth="1" />
+                <line x1="0" y1="0" x2="800" y2="0" stroke="#e5e7eb" strokeWidth="1" />
+                <line x1="0" y1="70" x2="800" y2="70" stroke="#e5e7eb" strokeWidth="0.5" />
+                <line x1="0" y1="140" x2="800" y2="140" stroke="#e5e7eb" strokeWidth="0.5" />
+                <line x1="0" y1="210" x2="800" y2="210" stroke="#e5e7eb" strokeWidth="0.5" />
+                {/* Y 라벨 */}
+                <text x="5" y="15" fontSize="12" fill="#6b7280">100%</text>
+                <text x="5" y="85" fontSize="12" fill="#6b7280">75%</text>
+                <text x="5" y="155" fontSize="12" fill="#6b7280">50%</text>
+                <text x="5" y="225" fontSize="12" fill="#6b7280">25%</text>
+
+                {(() => {
+                  const start = new Date(recentData[0].createdAt).getTime();
+                  const end = new Date(recentData[recentData.length - 1].createdAt).getTime();
+                  const total = Math.max(1, end - start);
+                  const sampleInterval = Math.max(1, Math.floor(recentData.length / (total / intervalMs)));
+                  const sampled: typeof recentData = [] as any;
+                  for (let i = 0; i < recentData.length; i += sampleInterval) sampled.push(recentData[i]);
+                  if (recentData.length > 0 && sampled[sampled.length - 1] !== recentData[recentData.length - 1]) sampled.push(recentData[recentData.length - 1]);
+
+                  // 옅은 배경선
+                  const bg = sampled.map((pt, idx) => {
+                    if (idx === 0) return null;
+                    const cx = 50 + ((new Date(pt.createdAt).getTime() - start) / total) * 700;
+                    const px = 50 + ((new Date(sampled[idx - 1].createdAt).getTime() - start) / total) * 700;
+                    const cy = 280 - (pt.waterLevel / 100) * 280;
+                    const py = 280 - (sampled[idx - 1].waterLevel / 100) * 280;
+                    return (
+                      <line key={`bg-${idx}`} x1={px} y1={py} x2={cx} y2={cy} stroke="#3b82f6" strokeWidth="1" opacity="0.35" />
+                    );
+                  });
+
+                  const fg = sampled.map((pt, idx) => {
+                    if (idx === 0) return null;
+                    const cx = 50 + ((new Date(pt.createdAt).getTime() - start) / total) * 700;
+                    const px = 50 + ((new Date(sampled[idx - 1].createdAt).getTime() - start) / total) * 700;
+                    const cy = 280 - (pt.waterLevel / 100) * 280;
+                    const py = 280 - (sampled[idx - 1].waterLevel / 100) * 280;
+                    return (
+                      <g key={`fg-${idx}`}>
+                        <line x1={px} y1={py} x2={cx} y2={cy} stroke="#3b82f6" strokeWidth="3" />
+                        <circle cx={cx} cy={cy} r="4" fill="#3b82f6" />
+                      </g>
+                    );
+                  });
+
+                  return (
+                    <g>
+                      {bg}
+                      {fg}
+                    </g>
+                  );
+                })()}
+
+                {/* X축 시간 라벨 (2시간 간격) */}
+                {(() => {
+                  const start = new Date(recentData[0].createdAt);
+                  const end = new Date(recentData[recentData.length - 1].createdAt);
+                  const labels: Date[] = [];
+                  const cur = new Date(start);
+                  // 정돈된 시작시간으로 스냅
+                  cur.setMinutes(0, 0, 0);
+                  while (cur <= end) {
+                    labels.push(new Date(cur));
+                    cur.setHours(cur.getHours() + 2);
+                  }
+                  return labels.map((t, i) => {
+                    // 가장 가까운 데이터의 위치로 표시
+                    let closest = 0;
+                    let min = Infinity;
+                    recentData.forEach((d, idx) => {
+                      const diff = Math.abs(new Date(d.createdAt).getTime() - t.getTime());
+                      if (diff < min) { min = diff; closest = idx; }
+                    });
+                    const startMs = new Date(recentData[0].createdAt).getTime();
+                    const endMs = new Date(recentData[recentData.length - 1].createdAt).getTime();
+                    const total = Math.max(1, endMs - startMs);
+                    const x = 50 + ((new Date(recentData[closest].createdAt).getTime() - startMs) / total) * 700;
+                    return (
+                      <g key={`tick-${i}`}>
+                        <line x1={x} y1="0" x2={x} y2="280" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
+                        <text x={x} y="300" fontSize="10" fill="#6b7280" textAnchor="middle">{String(t.getHours()).padStart(2, '0')}</text>
+                      </g>
+                    );
+                  });
+                })()}
+              </svg>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-400">데이터가 없습니다</div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 유량 그래프 */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center justify-between text-sm">
+            <span className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-yellow-500" />
+              유량 변화 (L/min)
+            </span>
+            <span className="text-xs text-gray-500">(2시간 간격)</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64 relative">
+            {recentData.length > 1 ? (
+              <svg className="w-full h-full" viewBox="0 0 800 320">
+                {/* 축/눈금 */}
+                <line x1="0" y1="0" x2="0" y2="280" stroke="#e5e7eb" strokeWidth="1" />
+                <line x1="0" y1="0" x2="800" y2="0" stroke="#e5e7eb" strokeWidth="1" />
+                <line x1="0" y1="70" x2="800" y2="70" stroke="#e5e7eb" strokeWidth="0.5" />
+                <line x1="0" y1="140" x2="800" y2="140" stroke="#e5e7eb" strokeWidth="0.5" />
+                <line x1="0" y1="210" x2="800" y2="210" stroke="#e5e7eb" strokeWidth="0.5" />
+                {/* Y 라벨 */}
+                <text x="5" y="15" fontSize="12" fill="#6b7280">50 L/min</text>
+                <text x="5" y="85" fontSize="12" fill="#6b7280">37.5 L/min</text>
+                <text x="5" y="155" fontSize="12" fill="#6b7280">25 L/min</text>
+                <text x="5" y="225" fontSize="12" fill="#6b7280">12.5 L/min</text>
+
+                {(() => {
+                  const start = new Date(recentData[0].createdAt).getTime();
+                  const end = new Date(recentData[recentData.length - 1].createdAt).getTime();
+                  const total = Math.max(1, end - start);
+                  const sampleInterval = Math.max(1, Math.floor(recentData.length / (total / intervalMs)));
+                  const sampled: typeof recentData = [] as any;
+                  for (let i = 0; i < recentData.length; i += sampleInterval) sampled.push(recentData[i]);
+                  if (recentData.length > 0 && sampled[sampled.length - 1] !== recentData[recentData.length - 1]) sampled.push(recentData[recentData.length - 1]);
+
+                  // 옅은 배경선
+                  const bg = sampled.map((pt, idx) => {
+                    if (idx === 0) return null;
+                    const cx = 50 + ((new Date(pt.createdAt).getTime() - start) / total) * 700;
+                    const px = 50 + ((new Date(sampled[idx - 1].createdAt).getTime() - start) / total) * 700;
+                    const cy = 280 - (pt.flowRate / 50) * 280;
+                    const py = 280 - (sampled[idx - 1].flowRate / 50) * 280;
+                    return (
+                      <line key={`bgf-${idx}`} x1={px} y1={py} x2={cx} y2={cy} stroke="#10b981" strokeWidth="1" opacity="0.35" />
+                    );
+                  });
+
+                  const fg = sampled.map((pt, idx) => {
+                    if (idx === 0) return null;
+                    const cx = 50 + ((new Date(pt.createdAt).getTime() - start) / total) * 700;
+                    const px = 50 + ((new Date(sampled[idx - 1].createdAt).getTime() - start) / total) * 700;
+                    const cy = 280 - (pt.flowRate / 50) * 280;
+                    const py = 280 - (sampled[idx - 1].flowRate / 50) * 280;
+                    return (
+                      <g key={`fgf-${idx}`}>
+                        <line x1={px} y1={py} x2={cx} y2={cy} stroke="#10b981" strokeWidth="3" />
+                        <circle cx={cx} cy={cy} r="4" fill="#10b981" />
+                      </g>
+                    );
+                  });
+
+                  return (
+                    <g>
+                      {bg}
+                      {fg}
+                    </g>
+                  );
+                })()}
+
+                {/* X축 시간 라벨 (2시간 간격) */}
+                {(() => {
+                  const start = new Date(recentData[0].createdAt);
+                  const end = new Date(recentData[recentData.length - 1].createdAt);
+                  const labels: Date[] = [];
+                  const cur = new Date(start);
+                  cur.setMinutes(0, 0, 0);
+                  while (cur <= end) {
+                    labels.push(new Date(cur));
+                    cur.setHours(cur.getHours() + 2);
+                  }
+                  return labels.map((t, i) => {
+                    let closest = 0;
+                    let min = Infinity;
+                    recentData.forEach((d, idx) => {
+                      const diff = Math.abs(new Date(d.createdAt).getTime() - t.getTime());
+                      if (diff < min) { min = diff; closest = idx; }
+                    });
+                    const startMs = new Date(recentData[0].createdAt).getTime();
+                    const endMs = new Date(recentData[recentData.length - 1].createdAt).getTime();
+                    const total = Math.max(1, endMs - startMs);
+                    const x = 50 + ((new Date(recentData[closest].createdAt).getTime() - startMs) / total) * 700;
+                    return (
+                      <g key={`tickf-${i}`}>
+                        <line x1={x} y1="0" x2={x} y2="280" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
+                        <text x={x} y="300" fontSize="10" fill="#6b7280" textAnchor="middle">{String(t.getHours()).padStart(2, '0')}</text>
+                      </g>
+                    );
+                  });
+                })()}
+              </svg>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-400">데이터가 없습니다</div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 약품 레벨 그래프 */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center justify-between text-sm">
+            <span className="flex items-center gap-2">
+              <Droplets className="h-4 w-4 text-purple-500" />
+              약품 변화 (%)
+            </span>
+            <span className="text-xs text-gray-500">(2시간 간격)</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64 relative">
+            {recentData.length > 1 ? (
+              <svg className="w-full h-full" viewBox="0 0 800 320">
+                {/* 축/눈금 */}
+                <line x1="0" y1="0" x2="0" y2="280" stroke="#e5e7eb" strokeWidth="1" />
+                <line x1="0" y1="0" x2="800" y2="0" stroke="#e5e7eb" strokeWidth="1" />
+                <line x1="0" y1="70" x2="800" y2="70" stroke="#e5e7eb" strokeWidth="0.5" />
+                <line x1="0" y1="140" x2="800" y2="140" stroke="#e5e7eb" strokeWidth="0.5" />
+                <line x1="0" y1="210" x2="800" y2="210" stroke="#e5e7eb" strokeWidth="0.5" />
+                {/* Y 라벨 */}
+                <text x="5" y="15" fontSize="12" fill="#6b7280">100%</text>
+                <text x="5" y="85" fontSize="12" fill="#6b7280">75%</text>
+                <text x="5" y="155" fontSize="12" fill="#6b7280">50%</text>
+                <text x="5" y="225" fontSize="12" fill="#6b7280">25%</text>
+
+                {(() => {
+                  const start = new Date(recentData[0].createdAt).getTime();
+                  const end = new Date(recentData[recentData.length - 1].createdAt).getTime();
+                  const total = Math.max(1, end - start);
+                  const sampleInterval = Math.max(1, Math.floor(recentData.length / (total / intervalMs)));
+                  const sampled: typeof recentData = [] as any;
+                  for (let i = 0; i < recentData.length; i += sampleInterval) sampled.push(recentData[i]);
+                  if (recentData.length > 0 && sampled[sampled.length - 1] !== recentData[recentData.length - 1]) sampled.push(recentData[recentData.length - 1]);
+
+                  // 옅은 배경선
+                  const bg = sampled.map((pt, idx) => {
+                    if (idx === 0) return null;
+                    const cx = 50 + ((new Date(pt.createdAt).getTime() - start) / total) * 700;
+                    const px = 50 + ((new Date(sampled[idx - 1].createdAt).getTime() - start) / total) * 700;
+                    const cy = 280 - (pt.chemicalLevel / 100) * 280;
+                    const py = 280 - (sampled[idx - 1].chemicalLevel / 100) * 280;
+                    return (
+                      <line key={`bgc-${idx}`} x1={px} y1={py} x2={cx} y2={cy} stroke="#8b5cf6" strokeWidth="1" opacity="0.35" />
+                    );
+                  });
+
+                  const fg = sampled.map((pt, idx) => {
+                    if (idx === 0) return null;
+                    const cx = 50 + ((new Date(pt.createdAt).getTime() - start) / total) * 700;
+                    const px = 50 + ((new Date(sampled[idx - 1].createdAt).getTime() - start) / total) * 700;
+                    const cy = 280 - (pt.chemicalLevel / 100) * 280;
+                    const py = 280 - (sampled[idx - 1].chemicalLevel / 100) * 280;
+                    return (
+                      <g key={`fgc-${idx}`}>
+                        <line x1={px} y1={py} x2={cx} y2={cy} stroke="#8b5cf6" strokeWidth="3" />
+                        <circle cx={cx} cy={cy} r="4" fill="#8b5cf6" />
+                      </g>
+                    );
+                  });
+
+                  return (
+                    <g>
+                      {bg}
+                      {fg}
+                    </g>
+                  );
+                })()}
+
+                {/* X축 시간 라벨 (2시간 간격) */}
+                {(() => {
+                  const start = new Date(recentData[0].createdAt);
+                  const end = new Date(recentData[recentData.length - 1].createdAt);
+                  const labels: Date[] = [];
+                  const cur = new Date(start);
+                  cur.setMinutes(0, 0, 0);
+                  while (cur <= end) {
+                    labels.push(new Date(cur));
+                    cur.setHours(cur.getHours() + 2);
+                  }
+                  return labels.map((t, i) => {
+                    let closest = 0;
+                    let min = Infinity;
+                    recentData.forEach((d, idx) => {
+                      const diff = Math.abs(new Date(d.createdAt).getTime() - t.getTime());
+                      if (diff < min) { min = diff; closest = idx; }
+                    });
+                    const startMs = new Date(recentData[0].createdAt).getTime();
+                    const endMs = new Date(recentData[recentData.length - 1].createdAt).getTime();
+                    const total = Math.max(1, endMs - startMs);
+                    const x = 50 + ((new Date(recentData[closest].createdAt).getTime() - startMs) / total) * 700;
+                    return (
+                      <g key={`tickc-${i}`}>
+                        <line x1={x} y1="0" x2={x} y2="280" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
+                        <text x={x} y="300" fontSize="10" fill="#6b7280" textAnchor="middle">{String(t.getHours()).padStart(2, '0')}</text>
+                      </g>
+                    );
+                  });
+                })()}
+              </svg>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-400">데이터가 없습니다</div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function SiteManagement() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [sites, setSites] = useState<Site[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingSite, setEditingSite] = useState<Site | null>(null);
+  const [selectedSite, setSelectedSite] = useState<Site | null>(null);
+  const [sensorData, setSensorData] = useState<SensorData[]>([]);
+  const [latestBySiteId, setLatestBySiteId] = useState<Record<string, { flowRate: number; totalAmount: number }>>({});
   const [formData, setFormData] = useState<Partial<Site>>({
     name: "",
     managementNumber: "",
@@ -172,6 +570,39 @@ export default function SiteManagement() {
     loadSites();
   }, [loadSites]);
 
+  const fetchSensorData = useCallback(async () => {
+    try {
+      const response = await fetch('http://localhost:8084/api/sensor/data');
+      if (!response.ok) return;
+      const data: SensorData[] = await response.json();
+      setSensorData(data);
+
+      // 최신값 맵 구성
+      const map: Record<string, { flowRate: number; totalAmount: number; createdAt: number }> = {};
+      for (const d of data) {
+        const ts = new Date(d.createdAt).getTime();
+        const prev = map[d.siteId];
+        if (!prev || ts > prev.createdAt) {
+          map[d.siteId] = { flowRate: d.flowRate, totalAmount: d.totalAmount, createdAt: ts };
+        }
+      }
+      const latestOnly: Record<string, { flowRate: number; totalAmount: number }> = {};
+      Object.keys(map).forEach(k => {
+        latestOnly[k] = { flowRate: map[k].flowRate, totalAmount: map[k].totalAmount };
+      });
+      setLatestBySiteId(latestOnly);
+    } catch (error) {
+      // 콘솔만 기록 (UI 토스트 소음 방지)
+      console.error('센서 데이터 조회 실패:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSensorData();
+    const timer = setInterval(fetchSensorData, 30000);
+    return () => clearInterval(timer);
+  }, [fetchSensorData]);
+
   const handleSubmit = async () => {
     try {
       if (editingSite) {
@@ -256,7 +687,123 @@ export default function SiteManagement() {
     }
   };
 
-
+  const SitesTable = () => (
+    <Card>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>사이트 정보</TableHead>
+              <TableHead>담당자</TableHead>
+              <TableHead>탱크 사양</TableHead>
+              <TableHead>용량</TableHead>
+              <TableHead>실시간 데이터</TableHead>
+              <TableHead>상태</TableHead>
+              <TableHead>작업</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredSites.map((site) => (
+              <TableRow 
+                key={site.id}
+                className={`${selectedSite?.id === site.id ? 'bg-blue-50' : ''} hover:bg-gray-50`}
+                onClick={() => setSelectedSite(site)}
+              >
+                <TableCell>
+                  <div>
+                    <button
+                      type="button"
+                      className="font-semibold text-blue-700 hover:underline"
+                      onClick={(e) => { e.stopPropagation(); navigate(`/test/${encodeURIComponent(site.id)}`); }}
+                      aria-label={`현장 ${site.name} 상세 보기`}
+                    >
+                      {site.name}
+                    </button>
+                    <div className="text-sm text-gray-500">{site.managementNumber}</div>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div>
+                    <div className="text-sm">{site.contactPerson}</div>
+                    <div className="text-xs text-gray-500 flex items-center">
+                      <Phone className="h-3 w-3 mr-1" />
+                      {site.contactPhone}
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div>
+                    <Badge variant="outline" className="mb-1">
+                      {site.tankType === 'circular' ? '원형' : '사각형'}
+                    </Badge>
+                    <div className="text-xs text-gray-500">
+                      {site.tankType === 'circular'
+                        ? `⌀${site.width}m × ${site.height}m`
+                        : `${site.width}m × ${site.length}m × ${site.height}m`}
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="text-sm font-medium">
+                    {site.volume.toFixed(1)} m³
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="space-y-1">
+                    <div className="flex items-center text-xs">
+                      <Activity className="h-3 w-3 mr-1 text-blue-500" />
+                      유량: {latestBySiteId[site.id]?.flowRate !== undefined ? latestBySiteId[site.id].flowRate.toFixed(1) : '-'} L/min
+                    </div>
+                    <div className="flex items-center text-xs">
+                      <Gauge className="h-3 w-3 mr-1 text-green-500" />
+                      누적: {latestBySiteId[site.id]?.totalAmount !== undefined ? latestBySiteId[site.id].totalAmount.toFixed(1) : '-'} L
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={getStatusBadge(site.status) as any}>
+                    {getStatusText(site.status)}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => { e.stopPropagation(); handleEdit(site); }}
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="outline" onClick={(e) => e.stopPropagation()}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>사이트 삭제</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            정말로 "{site.name}"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>취소</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDelete(site.id)}>
+                            삭제
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -307,6 +854,7 @@ export default function SiteManagement() {
                       value={formData.managementNumber || ""}
                       onChange={handleManagementNumberChange}
                       placeholder="예: RSA-001"
+                      disabled={!!editingSite}
                     />
                   </div>
                 </div>
@@ -466,112 +1014,21 @@ export default function SiteManagement() {
           </CardContent>
         </Card>
 
-        {/* Sites Table */}
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>사이트 정보</TableHead>
-                  <TableHead>담당자</TableHead>
-                  <TableHead>탱크 사양</TableHead>
-                  <TableHead>용량</TableHead>
-                  <TableHead>실시간 데이터</TableHead>
-                  <TableHead>상태</TableHead>
-                  <TableHead>작업</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSites.map((site) => (
-                  <TableRow key={site.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{site.name}</div>
-                        <div className="text-sm text-gray-500">{site.managementNumber}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="text-sm">{site.contactPerson}</div>
-                        <div className="text-xs text-gray-500 flex items-center">
-                          <Phone className="h-3 w-3 mr-1" />
-                          {site.contactPhone}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <Badge variant="outline" className="mb-1">
-                          {site.tankType === "circular" ? "원형" : "사각형"}
-                        </Badge>
-                        <div className="text-xs text-gray-500">
-                          {site.tankType === "circular"
-                            ? `⌀${site.width}m × ${site.height}m`
-                            : `${site.width}m × ${site.length}m × ${site.height}m`
-                          }
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm font-medium">
-                        {site.volume.toFixed(1)} m³
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center text-xs">
-                          <Activity className="h-3 w-3 mr-1 text-blue-500" />
-                          유량: {site.flowRate} L/min
-                        </div>
-                        <div className="flex items-center text-xs">
-                          <Gauge className="h-3 w-3 mr-1 text-green-500" />
-                          누적: {site.total.toFixed(1)} L
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusBadge(site.status) as any}>
-                        {getStatusText(site.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEdit(site)}
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="outline">
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>사이트 삭제</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                정말로 "{site.name}"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>취소</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(site.id)}>
-                                삭제
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        {/* 레이아웃: 선택 전에는 테이블 전체, 선택 후에는 4:6 분할 */}
+        {selectedSite ? (
+          <div className="grid grid-cols-10 gap-4">
+            {/* Left 4/10: Selected site graphs */}
+            <div className="col-span-10 lg:col-span-4">
+              <SiteGraphs selectedSite={selectedSite} sensorData={sensorData} onClose={() => setSelectedSite(null)} />
+            </div>
+            {/* Right 6/10: Sites Table */}
+            <div className="col-span-10 lg:col-span-6">
+              <SitesTable />
+            </div>
+          </div>
+        ) : (
+          <SitesTable />
+        )}
       </div>
     </div>
   );

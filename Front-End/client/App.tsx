@@ -65,6 +65,11 @@ const App = () => (
                 <Test />
               </ProtectedRoute>
             } />
+            <Route path="/test/:id" element={
+              <ProtectedRoute>
+                <Test />
+              </ProtectedRoute>
+            } />
             <Route path="/api-test" element={<AuthExample />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

@@ -1,17 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid } from "recharts";
 import {
   ArrowLeft,
   TrendingUp,
-  Download,
   Calendar,
   Filter,
   BarChart3,
@@ -19,48 +19,133 @@ import {
   Droplets,
   Zap
 } from "lucide-react";
+import { apiClient, type SiteResponse } from "@/lib/api";
 
-// Sample statistical data
-const flowStatsData = [
-  { month: "Jan", total: 45620, average: 1472, max: 2100, min: 180 },
-  { month: "Feb", total: 41230, average: 1472, max: 1950, min: 160 },
-  { month: "Mar", total: 48750, average: 1573, max: 2200, min: 190 },
-  { month: "Apr", total: 52100, average: 1737, max: 2350, min: 200 },
-  { month: "May", total: 49850, average: 1608, max: 2180, min: 185 },
-  { month: "Jun", total: 53400, average: 1780, max: 2400, min: 210 }
-];
-
-const waterLevelStatsData = [
-  { site: "현장 A", avgLevel: 78, fluctuation: 15, anomalies: 2 },
-  { site: "현장 B", avgLevel: 85, fluctuation: 8, anomalies: 0 },
-  { site: "현장 C", avgLevel: 72, fluctuation: 22, anomalies: 5 },
-  { site: "현장 D", avgLevel: 88, fluctuation: 6, anomalies: 1 },
-  { site: "현장 E", avgLevel: 75, fluctuation: 18, anomalies: 3 }
-];
-
-const motorStatsData = [
-  { motor: "모터 1", totalHours: 720, uptime: 95, malfunctions: 2, avgRunTime: 12.5 },
-  { motor: "모터 2", totalHours: 680, uptime: 89, malfunctions: 5, avgRunTime: 11.8 },
-  { motor: "모터 3", totalHours: 745, uptime: 98, malfunctions: 1, avgRunTime: 13.2 },
-  { motor: "모터 4", totalHours: 650, uptime: 85, malfunctions: 8, avgRunTime: 10.9 }
-];
-
-const efficiencyData = [
-  { category: "우수", value: 60, color: "#10b981" },
-  { category: "양호", value: 25, color: "#3b82f6" },
-  { category: "보통", value: 12, color: "#f59e0b" },
-  { category: "불량", value: 3, color: "#ef4444" }
-];
+// 통계 페이지에서 사용할 센서 데이터 타입
+interface SensorData {
+  id: number;
+  waterLevel: number;
+  chemicalLevel: number;
+  motorStatus1: number;
+  motorStatus2: number;
+  flowRate: number;
+  totalAmount: number;
+  leakAmount: number;
+  leakRate: number;
+  leakPercentage: number;
+  createdAt: string;
+  siteId: string;
+}
 
 export default function Statistics() {
-  const [dateRange, setDateRange] = useState("last-30-days");
-  const [selectedSite, setSelectedSite] = useState("all");
-  const [dataType, setDataType] = useState("all");
+  // 날짜 선택 (YYYY-MM-DD)
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  });
+  const [selectedSite, setSelectedSite] = useState<string>("all");
+  const [sites, setSites] = useState<SiteResponse[]>([]);
+  const [sensorData, setSensorData] = useState<SensorData[]>([]);
+  const [showMoreRecords, setShowMoreRecords] = useState<number>(10);
+  const [hasSearched, setHasSearched] = useState<boolean>(false);
 
-  const handleExport = (format: string) => {
-    console.log(`Exporting data in ${format} format`);
-    // TODO: Implement actual export functionality
+  // 내보내기 기능 제거
+
+  const loadSites = useCallback(async () => {
+    try {
+      const res = await apiClient.listSites();
+      if (res.success && Array.isArray(res.data)) setSites(res.data);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  const fetchSensorData = useCallback(async () => {
+    try {
+      const response = await fetch('http://localhost:8084/api/sensor/data');
+      if (!response.ok) return;
+      const data: SensorData[] = await response.json();
+      setSensorData(data);
+      setHasSearched(true);
+    } catch (e) {
+      console.error('센서 데이터 조회 실패:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSites();
+  }, [loadSites]);
+
+  const getDayRange = (ymd: string) => {
+    const [y, m, d] = ymd.split('-').map(Number);
+    const start = new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0);
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+    return { start, end };
   };
+
+  const { start: dayStart, end: dayEnd } = getDayRange(selectedDate);
+
+  const monthlyData = sensorData
+    .filter(d => {
+      const t = new Date(d.createdAt);
+      const byMonth = t >= dayStart && t <= dayEnd;
+      const bySite = selectedSite === 'all' || d.siteId === selectedSite;
+      return byMonth && bySite;
+    })
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  const buildSampled = (data: SensorData[], intervalHours: number) => {
+    if (data.length === 0) return [] as SensorData[];
+    const startMs = new Date(data[0].createdAt).getTime();
+    const endMs = new Date(data[data.length - 1].createdAt).getTime();
+    const total = Math.max(1, endMs - startMs);
+    const intervalMs = intervalHours * 60 * 60 * 1000;
+    const sampleInterval = Math.max(1, Math.floor(data.length / (total / intervalMs)));
+    const sampled: SensorData[] = [];
+    for (let i = 0; i < data.length; i += sampleInterval) sampled.push(data[i]);
+    if (data.length > 0 && sampled[sampled.length - 1] !== data[data.length - 1]) sampled.push(data[data.length - 1]);
+    return sampled;
+  };
+
+  // 모든 현장 모드 유틸리티
+  const getSiteName = (siteId: string) =>
+    sites.find((s) => s.managementCode === siteId)?.siteName || siteId;
+
+  const getDayDataBySite = (siteId: string) =>
+    sensorData
+      .filter((d) => d.siteId === siteId && new Date(d.createdAt) >= dayStart && new Date(d.createdAt) <= dayEnd)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  const siteIdsForDay: string[] = Array.from(
+    new Set(
+      sensorData
+        .filter((d) => new Date(d.createdAt) >= dayStart && new Date(d.createdAt) <= dayEnd)
+        .map((d) => d.siteId)
+    )
+  );
+
+  // 단일 현장 기록 테이블 유틸리티
+  const getStatusBadge = (value: number, type: 'water' | 'chemical' | 'leak') => {
+    if (type === 'water') {
+      if (value > 80) return 'destructive';
+      if (value > 60) return 'secondary';
+      return 'default';
+    } else if (type === 'chemical') {
+      if (value < 20) return 'destructive';
+      if (value < 40) return 'secondary';
+      return 'default';
+    } else {
+      if (value > 10) return 'destructive';
+      if (value > 5) return 'secondary';
+      return 'default';
+    }
+  };
+
+  const singleSiteRecordsDesc = selectedSite !== 'all'
+    ? [...monthlyData].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    : [];
+
+  const showRecords = singleSiteRecordsDesc.slice(0, showMoreRecords);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -79,16 +164,7 @@ export default function Statistics() {
             <Badge variant="outline">데이터 분석</Badge>
           </div>
           
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" onClick={() => handleExport("csv")}>
-              <Download className="h-4 w-4 mr-2" />
-              CSV 내보내기
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => handleExport("excel")}>
-              <Download className="h-4 w-4 mr-2" />
-              Excel 내보내기
-            </Button>
-          </div>
+          <div />
         </div>
       </header>
 
@@ -102,333 +178,399 @@ export default function Statistics() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">기간 범위</label>
-                <Select value={dateRange} onValueChange={setDateRange}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="last-7-days">최근 7일</SelectItem>
-                    <SelectItem value="last-30-days">최근 30일</SelectItem>
-                    <SelectItem value="last-3-months">최근 3개월</SelectItem>
-                    <SelectItem value="last-6-months">최근 6개월</SelectItem>
-                    <SelectItem value="last-year">최근 1년</SelectItem>
-                    <SelectItem value="custom">사용자 지정</SelectItem>
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium">날짜 선택</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="pl-9" />
+                </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">사이트</label>
+                <label className="text-sm font-medium">건별 현장조회</label>
                 <Select value={selectedSite} onValueChange={setSelectedSite}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="현장을 선택하세요" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">모든 사이트</SelectItem>
-                    <SelectItem value="site-a">현장 A</SelectItem>
-                    <SelectItem value="site-b">현장 B</SelectItem>
-                    <SelectItem value="site-c">현장 C</SelectItem>
+                    <SelectItem value="all">모든 현장</SelectItem>
+                    {sites.map((s) => (
+                      <SelectItem key={s.managementCode} value={s.managementCode}>
+                        {s.siteName} ({s.managementCode})
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">데이터 타입</label>
-                <Select value={dataType} onValueChange={setDataType}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">모든 데이터</SelectItem>
-                    <SelectItem value="flow">유량</SelectItem>
-                    <SelectItem value="water-level">수위</SelectItem>
-                    <SelectItem value="motor">모터 작동</SelectItem>
-                    <SelectItem value="chemical">화학물질 농도</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">필터 적용</label>
-                <Button className="w-full">
-                  필터 적용
-                </Button>
+                <label className="text-sm font-medium">검색</label>
+                <Button className="w-full" onClick={fetchSensorData}>검색</Button>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Statistics Tabs */}
-        <Tabs defaultValue="flow" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="flow">유량 통계</TabsTrigger>
-            <TabsTrigger value="water-level">수위</TabsTrigger>
-            <TabsTrigger value="motor">모터 작동</TabsTrigger>
-            <TabsTrigger value="efficiency">시스템 효율성</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="flow" className="space-y-4">
+        {/* 테스트 페이지 스타일의 24시간 그래프 섹션 */}
+        {hasSearched && selectedSite !== 'all' ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* 24시간 수위 변화 */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5" />
-                    월별 유량 트렌드
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Droplets className="h-5 w-5" />
+                  24시간 수위 변화 (%)
+                </span>
+                <span className="text-xs text-gray-500">{selectedDate} (2시간 간격)</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer
-                    config={{
-                      total: { label: "총 유량 (L)", color: "#3b82f6" },
-                      average: { label: "평균 유량 (L/min)", color: "#10b981" }
-                    }}
-                    className="h-80"
-                  >
-                    <LineChart data={flowStatsData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis
-                        dataKey="month"
-                        axisLine={true}
-                        tickLine={true}
-                        tick={true}
-                      />
-                      <YAxis
-                        axisLine={true}
-                        tickLine={true}
-                        tick={true}
-                      />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Line
-                        type="monotone"
-                        dataKey="total"
-                        stroke="#3b82f6"
-                        strokeWidth={2}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="average"
-                        stroke="#10b981"
-                        strokeWidth={2}
-                      />
-                    </LineChart>
-                  </ChartContainer>
+              <div className="h-80 relative">
+                {monthlyData.length > 1 ? (
+                  <svg className="w-full h-full" viewBox="0 0 800 320">
+                    <line x1="0" y1="0" x2="0" y2="280" stroke="#e5e7eb" strokeWidth="1" />
+                    <line x1="0" y1="0" x2="800" y2="0" stroke="#e5e7eb" strokeWidth="1" />
+                    <line x1="0" y1="70" x2="800" y2="70" stroke="#e5e7eb" strokeWidth="0.5" />
+                    <line x1="0" y1="140" x2="800" y2="140" stroke="#e5e7eb" strokeWidth="0.5" />
+                    <line x1="0" y1="210" x2="800" y2="210" stroke="#e5e7eb" strokeWidth="0.5" />
+                    <text x="5" y="15" fontSize="12" fill="#6b7280">100%</text>
+                    <text x="5" y="85" fontSize="12" fill="#6b7280">75%</text>
+                    <text x="5" y="155" fontSize="12" fill="#6b7280">50%</text>
+                    <text x="5" y="225" fontSize="12" fill="#6b7280">25%</text>
+                    {(() => {
+                      const sampled = buildSampled(monthlyData, 2);
+                      const startMs = dayStart.getTime();
+                      const endMs = dayEnd.getTime();
+                      const total = Math.max(1, endMs - startMs);
+                      const bg = sampled.map((d, i) => {
+                        if (i === 0) return null;
+                        const cx = 50 + ((new Date(d.createdAt).getTime() - startMs) / total) * 700;
+                        const px = 50 + ((new Date(sampled[i - 1].createdAt).getTime() - startMs) / total) * 700;
+                        const cy = 280 - (d.waterLevel / 100) * 280;
+                        const py = 280 - (sampled[i - 1].waterLevel / 100) * 280;
+                        return <line key={`wbg-${i}`} x1={px} y1={py} x2={cx} y2={cy} stroke="#3b82f6" strokeWidth="1" opacity="0.35" />;
+                      });
+                      const fg = sampled.map((d, i) => {
+                        if (i === 0) return null;
+                        const cx = 50 + ((new Date(d.createdAt).getTime() - startMs) / total) * 700;
+                        const px = 50 + ((new Date(sampled[i - 1].createdAt).getTime() - startMs) / total) * 700;
+                        const cy = 280 - (d.waterLevel / 100) * 280;
+                        const py = 280 - (sampled[i - 1].waterLevel / 100) * 280;
+                        return (
+                          <g key={`wfg-${i}`}>
+                            <line x1={px} y1={py} x2={cx} y2={cy} stroke="#3b82f6" strokeWidth="3" />
+                            <circle cx={cx} cy={cy} r="4" fill="#3b82f6" />
+                          </g>
+                        );
+                      });
+                      return <g>{bg}{fg}</g>;
+                    })()}
+                    {(() => {
+                      const labels: Date[] = [];
+                      const cur = new Date(dayStart);
+                      while (cur <= dayEnd) { labels.push(new Date(cur)); cur.setHours(cur.getHours() + 2); }
+                      return labels.map((t, i) => {
+                        let closest = 0; let min = Infinity;
+                        monthlyData.forEach((d, idx) => { const diff = Math.abs(new Date(d.createdAt).getTime() - t.getTime()); if (diff < min) { min = diff; closest = idx; } });
+                        const sMs = dayStart.getTime();
+                        const eMs = dayEnd.getTime();
+                        const total = Math.max(1, eMs - sMs);
+                        const x = 50 + ((new Date(monthlyData[closest].createdAt).getTime() - sMs) / total) * 700;
+                        return (
+                          <g key={`wtick-${i}`}>
+                            <line x1={x} y1="0" x2={x} y2="280" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
+                            <text x={x} y="300" fontSize="10" fill="#6b7280" textAnchor="middle">{String(t.getHours()).padStart(2, '0')}</text>
+                          </g>
+                        );
+                      });
+                    })()}
+                  </svg>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400">데이터가 없습니다</div>
+                )}
+              </div>
                 </CardContent>
               </Card>
 
+          {/* 24시간 유량 변화 */}
               <Card>
                 <CardHeader>
-                  <CardTitle>유량 통계 요약</CardTitle>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  24시간 유량 변화 (L/min)
+                </span>
+                <span className="text-xs text-gray-500">{selectedDate} (2시간 간격)</span>
+              </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center p-3 bg-blue-50 rounded-lg">
-                        <div className="text-2xl font-bold text-blue-600">291k L</div>
-                        <div className="text-sm text-blue-700">총 유량 (6개월)</div>
-                      </div>
-                      <div className="text-center p-3 bg-green-50 rounded-lg">
-                        <div className="text-2xl font-bold text-green-600">1,610 L/min</div>
-                        <div className="text-sm text-green-700">평균 유량</div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center p-3 bg-orange-50 rounded-lg">
-                        <div className="text-2xl font-bold text-orange-600">2,400 L/min</div>
-                        <div className="text-sm text-orange-700">최대 유량</div>
-                      </div>
-                      <div className="text-center p-3 bg-purple-50 rounded-lg">
-                        <div className="text-2xl font-bold text-purple-600">160 L/min</div>
-                        <div className="text-sm text-purple-700">최소 유량</div>
-                      </div>
-                    </div>
+              <div className="h-80 relative">
+                {monthlyData.length > 1 ? (
+                  <svg className="w-full h-full" viewBox="0 0 800 320">
+                    <line x1="0" y1="0" x2="0" y2="280" stroke="#e5e7eb" strokeWidth="1" />
+                    <line x1="0" y1="0" x2="800" y2="0" stroke="#e5e7eb" strokeWidth="1" />
+                    <line x1="0" y1="70" x2="800" y2="70" stroke="#e5e7eb" strokeWidth="0.5" />
+                    <line x1="0" y1="140" x2="800" y2="140" stroke="#e5e7eb" strokeWidth="0.5" />
+                    <line x1="0" y1="210" x2="800" y2="210" stroke="#e5e7eb" strokeWidth="0.5" />
+                    <text x="5" y="15" fontSize="12" fill="#6b7280">50 L/min</text>
+                    <text x="5" y="85" fontSize="12" fill="#6b7280">37.5 L/min</text>
+                    <text x="5" y="155" fontSize="12" fill="#6b7280">25 L/min</text>
+                    <text x="5" y="225" fontSize="12" fill="#6b7280">12.5 L/min</text>
+                    {(() => {
+                      const sampled = buildSampled(monthlyData, 2);
+                      const startMs = dayStart.getTime();
+                      const endMs = dayEnd.getTime();
+                      const total = Math.max(1, endMs - startMs);
+                      const bg = sampled.map((d, i) => {
+                        if (i === 0) return null;
+                        const cx = 50 + ((new Date(d.createdAt).getTime() - startMs) / total) * 700;
+                        const px = 50 + ((new Date(sampled[i - 1].createdAt).getTime() - startMs) / total) * 700;
+                        const cy = 280 - (d.flowRate / 50) * 280;
+                        const py = 280 - (sampled[i - 1].flowRate / 50) * 280;
+                        return <line key={`fbg-${i}`} x1={px} y1={py} x2={cx} y2={cy} stroke="#10b981" strokeWidth="1" opacity="0.35" />;
+                      });
+                      const fg = sampled.map((d, i) => {
+                        if (i === 0) return null;
+                        const cx = 50 + ((new Date(d.createdAt).getTime() - startMs) / total) * 700;
+                        const px = 50 + ((new Date(sampled[i - 1].createdAt).getTime() - startMs) / total) * 700;
+                        const cy = 280 - (d.flowRate / 50) * 280;
+                        const py = 280 - (sampled[i - 1].flowRate / 50) * 280;
+                        return (
+                          <g key={`ffg-${i}`}>
+                            <line x1={px} y1={py} x2={cx} y2={cy} stroke="#10b981" strokeWidth="3" />
+                            <circle cx={cx} cy={cy} r="4" fill="#10b981" />
+                          </g>
+                        );
+                      });
+                      return <g>{bg}{fg}</g>;
+                    })()}
+                    {(() => {
+                      const labels: Date[] = [];
+                      const cur = new Date(dayStart);
+                      while (cur <= dayEnd) { labels.push(new Date(cur)); cur.setHours(cur.getHours() + 2); }
+                      return labels.map((t, i) => {
+                        let closest = 0; let min = Infinity;
+                        monthlyData.forEach((d, idx) => { const diff = Math.abs(new Date(d.createdAt).getTime() - t.getTime()); if (diff < min) { min = diff; closest = idx; } });
+                        const sMs = dayStart.getTime();
+                        const eMs = dayEnd.getTime();
+                        const total = Math.max(1, eMs - sMs);
+                        const x = 50 + ((new Date(monthlyData[closest].createdAt).getTime() - sMs) / total) * 700;
+                        return (
+                          <g key={`ftick-${i}`}>
+                            <line x1={x} y1="0" x2={x} y2="280" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
+                            <text x={x} y="300" fontSize="10" fill="#6b7280" textAnchor="middle">{String(t.getHours()).padStart(2, '0')}</text>
+                          </g>
+                        );
+                      });
+                    })()}
+                  </svg>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400">데이터가 없습니다</div>
+                )}
                   </div>
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-
-          <TabsContent value="water-level" className="space-y-4">
+        ) : hasSearched ? (
+          <div className="space-y-10">
+            {siteIdsForDay.map((sid) => {
+              const data = getDayDataBySite(sid);
+              if (data.length < 2) return null;
+              const sampled = buildSampled(data, 2);
+              const siteLabel = `${getSiteName(sid)} (${sid})`;
+              return (
+                <div key={sid} className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">{siteLabel}</h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* 수위 */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                        <CardTitle className="flex items-center justify-between">
+                          <span className="flex items-center gap-2">
                   <Droplets className="h-5 w-5" />
-                  사이트별 수위 통계
+                            수위 변화 (%)
+                          </span>
+                          <span className="text-xs text-gray-500">{selectedDate} (2시간 간격)</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ChartContainer
-                  config={{
-                    avgLevel: { label: "평균 수위 (%)", color: "#3b82f6" },
-                    fluctuation: { label: "변동 범위 (%)", color: "#f59e0b" }
-                  }}
-                  className="h-80"
-                >
-                  <BarChart data={waterLevelStatsData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                      dataKey="site"
-                      axisLine={true}
-                      tickLine={true}
-                      tick={true}
-                    />
-                    <YAxis
-                      axisLine={true}
-                      tickLine={true}
-                      tick={true}
-                    />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="avgLevel" fill="#3b82f6" />
-                    <Bar dataKey="fluctuation" fill="#f59e0b" />
-                  </BarChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="motor" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="h-5 w-5" />
-                  모터 운영 통계
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <ChartContainer
-                    config={{
-                      uptime: { label: "가동률 (%)", color: "#10b981" }
-                    }}
-                    className="h-64"
-                  >
-                    <BarChart data={motorStatsData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis
-                        dataKey="motor"
-                        axisLine={true}
-                        tickLine={true}
-                        tick={true}
-                      />
-                      <YAxis
-                        axisLine={true}
-                        tickLine={true}
-                        tick={true}
-                      />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Bar dataKey="uptime" fill="#10b981" />
-                    </BarChart>
-                  </ChartContainer>
-
-                  <div className="space-y-4">
-                    {motorStatsData.map((motor, index) => (
-                      <div key={index} className="p-4 border rounded-lg">
-                        <h4 className="font-medium mb-2">{motor.motor}</h4>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>총 가동시간: <span className="font-medium">{motor.totalHours}시간</span></div>
-                          <div>가동률: <span className="font-medium">{motor.uptime}%</span></div>
-                          <div>고장 횟수: <span className="font-medium">{motor.malfunctions}회</span></div>
-                          <div>평균 가동시간: <span className="font-medium">{motor.avgRunTime}시간</span></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                        <div className="h-64 relative">
+                          <svg className="w-full h-full" viewBox="0 0 800 320">
+                            <line x1="0" y1="0" x2="0" y2="280" stroke="#e5e7eb" strokeWidth="1" />
+                            <line x1="0" y1="0" x2="800" y2="0" stroke="#e5e7eb" strokeWidth="1" />
+                            <line x1="0" y1="70" x2="800" y2="70" stroke="#e5e7eb" strokeWidth="0.5" />
+                            <line x1="0" y1="140" x2="800" y2="140" stroke="#e5e7eb" strokeWidth="0.5" />
+                            <line x1="0" y1="210" x2="800" y2="210" stroke="#e5e7eb" strokeWidth="0.5" />
+                            <text x="5" y="15" fontSize="12" fill="#6b7280">100%</text>
+                            <text x="5" y="85" fontSize="12" fill="#6b7280">75%</text>
+                            <text x="5" y="155" fontSize="12" fill="#6b7280">50%</text>
+                            <text x="5" y="225" fontSize="12" fill="#6b7280">25%</text>
+                            {sampled.map((d, i) => {
+                              if (i === 0) return null;
+                              const startMs = dayStart.getTime();
+                              const endMs = dayEnd.getTime();
+                              const total = Math.max(1, endMs - startMs);
+                              const cx = 50 + ((new Date(d.createdAt).getTime() - startMs) / total) * 700;
+                              const px = 50 + ((new Date(sampled[i - 1].createdAt).getTime() - startMs) / total) * 700;
+                              const cy = 280 - (d.waterLevel / 100) * 280;
+                              const py = 280 - (sampled[i - 1].waterLevel / 100) * 280;
+                              return (
+                                <g key={`w-${i}`}>
+                                  <line x1={px} y1={py} x2={cx} y2={cy} stroke="#3b82f6" strokeWidth="3" />
+                                  <circle cx={cx} cy={cy} r="4" fill="#3b82f6" />
+                                </g>
+                              );
+                            })}
+                            {(() => {
+                              const sMs = dayStart.getTime();
+                              const eMs = dayEnd.getTime();
+                              const total = Math.max(1, eMs - sMs);
+                              const hours: number[] = [];
+                              for (let h = 0; h <= 24; h += 2) hours.push(h);
+                              return hours.map((h, i) => {
+                                const tMs = sMs + h * 60 * 60 * 1000;
+                                const x = 50 + ((tMs - sMs) / total) * 700;
+                                return (
+                                  <g key={`wtick-${i}`}>
+                                    <line x1={x} y1="0" x2={x} y2="280" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
+                                    <text x={x} y="300" fontSize="10" fill="#6b7280" textAnchor="middle">{String(h).padStart(2, '0')}</text>
+                                  </g>
+                                );
+                              });
+                            })()}
+                          </svg>
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          <TabsContent value="efficiency" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* 유량 */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5" />
-                    시스템 효율성 분포
+                        <CardTitle className="flex items-center justify-between">
+                          <span className="flex items-center gap-2">
+                            <Activity className="h-5 w-5" />
+                            유량 변화 (L/min)
+                          </span>
+                          <span className="text-xs text-gray-500">{selectedDate} (2시간 간격)</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer
-                    config={{
-                      excellent: { label: "우수", color: "#10b981" },
-                      good: { label: "양호", color: "#3b82f6" },
-                      fair: { label: "보통", color: "#f59e0b" },
-                      poor: { label: "불량", color: "#ef4444" }
-                    }}
-                    className="h-64"
-                  >
-                    <PieChart>
-                      <Pie
-                        data={efficiencyData}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        dataKey="value"
-                        label={({ category, value }) => `${category}: ${value}%`}
-                      >
-                        {efficiencyData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                    </PieChart>
-                  </ChartContainer>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>성능 지표</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                      <span className="font-medium">전체 시스템 효율성</span>
-                      <span className="text-2xl font-bold text-green-600">92%</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                      <span className="font-medium">평균 응답 시간</span>
-                      <span className="text-2xl font-bold text-blue-600">1.2s</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
-                      <span className="font-medium">에너지 효율성</span>
-                      <span className="text-2xl font-bold text-orange-600">87%</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
-                      <span className="font-medium">예측 정확도</span>
-                      <span className="text-2xl font-bold text-purple-600">94%</span>
-                    </div>
+                        <div className="h-64 relative">
+                          <svg className="w-full h-full" viewBox="0 0 800 320">
+                            <line x1="0" y1="0" x2="0" y2="280" stroke="#e5e7eb" strokeWidth="1" />
+                            <line x1="0" y1="0" x2="800" y2="0" stroke="#e5e7eb" strokeWidth="1" />
+                            <line x1="0" y1="70" x2="800" y2="70" stroke="#e5e7eb" strokeWidth="0.5" />
+                            <line x1="0" y1="140" x2="800" y2="140" stroke="#e5e7eb" strokeWidth="0.5" />
+                            <line x1="0" y1="210" x2="800" y2="210" stroke="#e5e7eb" strokeWidth="0.5" />
+                            <text x="5" y="15" fontSize="12" fill="#6b7280">50 L/min</text>
+                            <text x="5" y="85" fontSize="12" fill="#6b7280">37.5 L/min</text>
+                            <text x="5" y="155" fontSize="12" fill="#6b7280">25 L/min</text>
+                            <text x="5" y="225" fontSize="12" fill="#6b7280">12.5 L/min</text>
+                            {sampled.map((d, i) => {
+                              if (i === 0) return null;
+                              const startMs = dayStart.getTime();
+                              const endMs = dayEnd.getTime();
+                              const total = Math.max(1, endMs - startMs);
+                              const cx = 50 + ((new Date(d.createdAt).getTime() - startMs) / total) * 700;
+                              const px = 50 + ((new Date(sampled[i - 1].createdAt).getTime() - startMs) / total) * 700;
+                              const cy = 280 - (d.flowRate / 50) * 280;
+                              const py = 280 - (sampled[i - 1].flowRate / 50) * 280;
+                              return (
+                                <g key={`f-${i}`}>
+                                  <line x1={px} y1={py} x2={cx} y2={cy} stroke="#10b981" strokeWidth="3" />
+                                  <circle cx={cx} cy={cy} r="4" fill="#10b981" />
+                                </g>
+                              );
+                            })}
+                            {(() => {
+                              const sMs = dayStart.getTime();
+                              const eMs = dayEnd.getTime();
+                              const total = Math.max(1, eMs - sMs);
+                              const hours: number[] = [];
+                              for (let h = 0; h <= 24; h += 2) hours.push(h);
+                              return hours.map((h, i) => {
+                                const tMs = sMs + h * 60 * 60 * 1000;
+                                const x = 50 + ((tMs - sMs) / total) * 700;
+                                return (
+                                  <g key={`ftick-${i}`}>
+                                    <line x1={x} y1="0" x2={x} y2="280" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
+                                    <text x={x} y="300" fontSize="10" fill="#6b7280" textAnchor="middle">{String(h).padStart(2, '0')}</text>
+                                  </g>
+                                );
+                              });
+                            })()}
+                          </svg>
                   </div>
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-        </Tabs>
+                </div>
+              );
+            })}
+            </div>
+        ) : null}
 
-        {/* Export Options */}
+        {/* 단일 현장 선택 시 기록 테이블 */}
+        {hasSearched && selectedSite !== 'all' && (
         <Card>
           <CardHeader>
-            <CardTitle>데이터 내보내기</CardTitle>
+              <CardTitle>현장 기록 ({getSiteName(selectedSite)} - {selectedSite})</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Button variant="outline" onClick={() => handleExport("csv")}>
-                <Download className="h-4 w-4 mr-2" />
-                CSV로 내보내기
-              </Button>
-              <Button variant="outline" onClick={() => handleExport("excel")}>
-                <Download className="h-4 w-4 mr-2" />
-                Excel로 내보내기
-              </Button>
-              <Button variant="outline" onClick={() => handleExport("pdf")}>
-                <Download className="h-4 w-4 mr-2" />
-                PDF 보고서로 내보내기
-              </Button>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>시간</TableHead>
+                      <TableHead>수위 (%)</TableHead>
+                      <TableHead>약품 (%)</TableHead>
+                      <TableHead>유량 (L/min)</TableHead>
+                      <TableHead>적산 (L)</TableHead>
+                      <TableHead>누수량 (L)</TableHead>
+                      <TableHead>일일 누수율 (%)</TableHead>
+                      <TableHead>모터 상태</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {showRecords.map((d, idx) => (
+                      <TableRow key={d.id || idx}>
+                        <TableCell className="text-sm text-gray-500">{new Date(d.createdAt).toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusBadge(d.waterLevel, 'water') as any}>{d.waterLevel}%</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusBadge(d.chemicalLevel, 'chemical') as any}>{d.chemicalLevel}%</Badge>
+                        </TableCell>
+                        <TableCell><span className="font-mono">{d.flowRate.toFixed(2)}</span></TableCell>
+                        <TableCell><span className="font-mono">{d.totalAmount.toLocaleString()}</span></TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusBadge(d.leakAmount, 'leak') as any}>{d.leakAmount.toFixed(2)}</Badge>
+                        </TableCell>
+                        <TableCell><span className="font-mono">{d.leakPercentage.toFixed(1)}%</span></TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <div className={`w-2 h-2 rounded-full ${d.motorStatus1 === 1 ? 'bg-green-500' : 'bg-red-500'}`} />
+                            <div className={`w-2 h-2 rounded-full ${d.motorStatus2 === 1 ? 'bg-green-500' : 'bg-red-500'}`} />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {singleSiteRecordsDesc.length > showMoreRecords && (
+                <div className="mt-4 text-center">
+                  <Button variant="outline" onClick={() => setShowMoreRecords((n) => n + 10)} className="w-full">더보기 ({showMoreRecords}/{singleSiteRecordsDesc.length})</Button>
             </div>
+              )}
           </CardContent>
         </Card>
+        )}
+
+        {/* 내보내기 섹션 제거 */}
       </div>
     </div>
   );

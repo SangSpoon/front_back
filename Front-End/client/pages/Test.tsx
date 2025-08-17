@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +39,8 @@ interface SensorData {
 }
 
 export default function Test() {
+  const params = useParams();
+  const routedSiteId = params.id ?? null;
   // 실시간 센서 데이터 상태
   const [sensorData, setSensorData] = useState<SensorData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -89,6 +92,13 @@ export default function Test() {
   useEffect(() => {
     fetchSensorData();
   }, []);
+
+  // URL 파라미터로 들어온 경우 자동 상세 열기
+  useEffect(() => {
+    if (routedSiteId) {
+      setSelectedSite(routedSiteId);
+    }
+  }, [routedSiteId]);
 
   // 모터 상태 텍스트 변환
   const getMotorStatusText = (status1: number, status2: number) => {
@@ -304,7 +314,7 @@ export default function Test() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-500">
-              마지막 업데이트: {new Date(siteData.createdAt).toLocaleTimeString()}
+              마지막 업데이트: {new Date(siteData.createdAt).toLocaleTimeString('ko-KR', { hour12: false })}
             </span>
             <Button variant="outline" size="sm" onClick={fetchSensorData} disabled={isLoading}>
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -658,7 +668,7 @@ export default function Test() {
                                     fill="#6b7280" 
                                     textAnchor="middle"
                                   >
-                                    {time.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}
+                                    {time.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit', hour12: false})}
                                   </text>
                                 </g>
                               );
@@ -896,7 +906,7 @@ export default function Test() {
                                     fill="#6b7280" 
                                     textAnchor="middle"
                                   >
-                                    {time.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}
+                                    {time.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit', hour12: false})}
                                   </text>
                                 </g>
                               );
@@ -1113,7 +1123,7 @@ export default function Test() {
                         </div>
                       </TableCell>
                       <TableCell className="text-sm text-gray-500">
-                        {new Date(data.createdAt).toLocaleTimeString()}
+                        {new Date(data.createdAt).toLocaleTimeString('ko-KR', { hour12: false })}
                       </TableCell>
                       <TableCell>
                         <Button

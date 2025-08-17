@@ -202,7 +202,7 @@ export default function SiteDetails() {
           
           <div className="flex items-center space-x-2 text-sm text-gray-600">
             <Clock className="h-4 w-4" />
-            <span>마지막 업데이트: {lastRefresh.toLocaleTimeString()}</span>
+            <span>마지막 업데이트: {lastRefresh.toLocaleTimeString('ko-KR', { hour12: false })}</span>
             <Button variant="ghost" size="sm" onClick={() => setLastRefresh(new Date())}>
               <RefreshCw className="h-4 w-4" />
             </Button>
