@@ -19,9 +19,19 @@ export default function Index() {
     password: "",
   });
 
+  // 디버깅을 위한 로그
+  console.log('Index 페이지 렌더링:', { 
+    authLoading, 
+    isAuthenticated, 
+    showLogin,
+    userAgent: navigator.userAgent 
+  });
+
   // 이미 로그인된 사용자라면 대시보드로 리다이렉트
   useEffect(() => {
+    console.log('Index useEffect 실행:', { authLoading, isAuthenticated });
     if (!authLoading && isAuthenticated) {
+      console.log('대시보드로 리다이렉트');
       navigate("/dashboard");
     }
   }, [authLoading, isAuthenticated, navigate]);
@@ -65,8 +75,11 @@ export default function Index() {
     }
   };
 
+  console.log('Index 렌더링 조건:', { showLogin, authLoading, isAuthenticated });
+  
   if (!showLogin) {
     // 초기 화면: 시스템 소개 페이지
+    console.log('Index: 초기 화면 렌더링');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-200">
         {/* 헤더 */}
@@ -184,6 +197,7 @@ export default function Index() {
   }
 
   // 로그인 화면
+  console.log('Index: 로그인 화면 렌더링');
   return (
     <div className="min-h-screen flex items-center justify-center p-8 bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-200">
       <div className="w-full max-w-md space-y-8">

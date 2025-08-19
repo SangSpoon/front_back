@@ -20,7 +20,8 @@ import {
   Clock,
   ArrowLeft,
   Zap,
-  Waves
+  Waves,
+  Star
 } from "lucide-react";
 import HeaderNav from "@/components/Header";
 
@@ -48,6 +49,9 @@ export default function Test() {
   const [selectedSite, setSelectedSite] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<string>("24h");
   const [showMoreRecords, setShowMoreRecords] = useState<number>(10);
+  
+  // 즐겨찾기 관련 상태
+  const [favoriteSites, setFavoriteSites] = useState<string[]>([]);
 
   // 실시간 센서 데이터 가져오기
   const fetchSensorData = async () => {
@@ -89,9 +93,39 @@ export default function Test() {
     }
   };
 
+  // 즐겨찾기 관련 함수들
+  const loadFavoriteSites = () => {
+    const saved = localStorage.getItem('favoriteSites');
+    if (saved) {
+      try {
+        setFavoriteSites(JSON.parse(saved));
+      } catch (error) {
+        console.error('즐겨찾기 로드 실패:', error);
+        setFavoriteSites([]);
+      }
+    }
+  };
+
+  const saveFavoriteSites = (sites: string[]) => {
+    localStorage.setItem('favoriteSites', JSON.stringify(sites));
+    setFavoriteSites(sites);
+  };
+
+  const toggleFavorite = (siteId: string) => {
+    const newFavorites = favoriteSites.includes(siteId)
+      ? favoriteSites.filter(id => id !== siteId)
+      : [...favoriteSites, siteId];
+    saveFavoriteSites(newFavorites);
+  };
+
+  const isFavorite = (siteId: string) => {
+    return favoriteSites.includes(siteId);
+  };
+
   // 컴포넌트 마운트 시 데이터 가져오기
   useEffect(() => {
     fetchSensorData();
+    loadFavoriteSites();
   }, []);
 
   // URL 파라미터로 들어온 경우 자동 상세 열기
@@ -1084,6 +1118,7 @@ export default function Test() {
                     <TableHead>일일 누수율 (%)</TableHead>
                     <TableHead>모터 상태</TableHead>
                     <TableHead>최신 업데이트</TableHead>
+                    <TableHead>즐겨찾기</TableHead>
                     <TableHead>상세보기</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1126,6 +1161,16 @@ export default function Test() {
                       </TableCell>
                       <TableCell className="text-sm text-gray-500">
                         {new Date(data.createdAt).toLocaleTimeString('ko-KR', { hour12: false })}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleFavorite(data.siteId)}
+                          className={`p-1 h-8 w-8 ${isFavorite(data.siteId) ? 'text-yellow-500' : 'text-gray-400'}`}
+                        >
+                          <Star className={`h-4 w-4 ${isFavorite(data.siteId) ? 'fill-current' : ''}`} />
+                        </Button>
                       </TableCell>
                       <TableCell>
                         <Button

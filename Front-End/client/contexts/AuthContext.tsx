@@ -37,15 +37,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const checkCurrentUser = async () => {
+    console.log('AuthContext: 사용자 정보 확인 시작');
     try {
       const response = await apiClient.getCurrentUser();
+      console.log('AuthContext: 사용자 정보 응답:', response);
       if (response.success && response.member) {
         setUser(response.member);
+        console.log('AuthContext: 사용자 설정됨:', response.member);
+      } else {
+        console.log('AuthContext: 사용자 정보 없음');
+        setUser(null);
       }
     } catch (error) {
-      console.log('사용자 정보 확인 실패:', error);
+      console.log('AuthContext: 사용자 정보 확인 실패:', error);
       setUser(null);
     } finally {
+      console.log('AuthContext: 로딩 완료');
       setIsLoading(false);
     }
   };
