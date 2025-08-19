@@ -1,15 +1,14 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { Area, AreaChart, Bar, BarChart, Pie, PieChart, Cell, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Line, LineChart } from "recharts";
+import { Pie, PieChart, Cell, XAxis, YAxis, CartesianGrid, Line, LineChart } from "recharts";
 import {
   Droplets,
   Activity,
@@ -18,16 +17,13 @@ import {
   AlertTriangle,
   CheckCircle,
   Search,
-  Bell,
   MapPin,
   TrendingUp,
-  TrendingDown,
-  Clock,
-  Settings,
   LogOut,
-  X,
-  TestTube
+  TestTube,
+  Settings
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // Sample data for demonstration
 const fieldOverviewData = {
@@ -46,7 +42,7 @@ const favoriteFields = [
 ];
 
 // 24-hour trend data for favorite fields
-const favoriteFieldData: Record<string, { waterLevel: Array<{time: string, level: number}>, flowRate: Array<{time: string, flow: number}> }> = {
+const favoriteFieldData = {
   "site-a": {
     waterLevel: [
       { time: "00:00", level: 85 }, { time: "01:00", level: 87 }, { time: "02:00", level: 86 }, { time: "03:00", level: 84 },
@@ -119,54 +115,14 @@ const favoriteFieldData: Record<string, { waterLevel: Array<{time: string, level
       { time: "20:00", flow: 27.9 }, { time: "21:00", flow: 28.2 }, { time: "22:00", flow: 28.7 }, { time: "23:00", flow: 28.1 },
     ]
   }
-};
+} as const;
 
 const waterLevelData = [
-  {
-    id: "1",
-    site: "현장 A",
-    level: 85,
-    flowRate: 33.2,
-    motor1Status: "operating",
-    motor2Status: "not-operating",
-    status: "normal"
-  },
-  {
-    id: "2",
-    site: "현장 B",
-    level: 92,
-    flowRate: 23.8,
-    motor1Status: "operating",
-    motor2Status: "operating",
-    status: "high"
-  },
-  {
-    id: "3",
-    site: "현장 C",
-    level: 15,
-    flowRate: 0,
-    motor1Status: "not-operating",
-    motor2Status: "not-operating",
-    status: "low"
-  },
-  {
-    id: "4",
-    site: "현장 D",
-    level: 78,
-    flowRate: 28.5,
-    motor1Status: "operating",
-    motor2Status: "not-operating",
-    status: "normal"
-  },
-  {
-    id: "5",
-    site: "현장 E",
-    level: 88,
-    flowRate: 31.7,
-    motor1Status: "operating",
-    motor2Status: "operating",
-    status: "normal"
-  },
+  { id: "1", site: "현장 A", level: 85, flowRate: 33.2, motor1Status: "operating", motor2Status: "not-operating", status: "normal" },
+  { id: "2", site: "현장 B", level: 92, flowRate: 23.8, motor1Status: "operating", motor2Status: "operating", status: "high" },
+  { id: "3", site: "현장 C", level: 15, flowRate: 0, motor1Status: "not-operating", motor2Status: "not-operating", status: "low" },
+  { id: "4", site: "현장 D", level: 78, flowRate: 28.5, motor1Status: "operating", motor2Status: "not-operating", status: "normal" },
+  { id: "5", site: "현장 E", level: 88, flowRate: 31.7, motor1Status: "operating", motor2Status: "operating", status: "normal" }, // fixed "operaging"
 ];
 
 const motorStatusData = [
@@ -189,13 +145,16 @@ const abnormalSites = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { logout, user } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
+  const { logout } = useAuth();
   const [fieldSearchQuery, setFieldSearchQuery] = useState("");
-  const [sortColumn, setSortColumn] = useState<string>("");
+  const [sortColumn, setSortColumn] = useState("");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [selectedFavoriteField, setSelectedFavoriteField] = useState<string>("site-a");
   const [alerts, setAlerts] = useState(alertData);
+
+  // Dialogs for "Active" and "Alert" sites
+  const [openActive, setOpenActive] = useState(false);
+  const [openAlert, setOpenAlert] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -203,16 +162,7 @@ export default function Dashboard() {
   };
 
   const dismissAlert = (alertId: number) => {
-    setAlerts(alerts.filter(alert => alert.id !== alertId));
-  };
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case "high": return "bg-red-500";
-      case "medium": return "bg-yellow-500";
-      case "low": return "bg-blue-500";
-      default: return "bg-gray-500";
-    }
+    setAlerts((prev) => prev.filter((a) => a.id !== alertId));
   };
 
   const getSeverityBadge = (severity: string) => {
@@ -224,58 +174,38 @@ export default function Dashboard() {
     }
   };
 
-  const getSeverityText = (severity: string) => {
-    switch (severity) {
-      case "high": return "긴급";
-      case "medium": return "주의";
-      case "low": return "정보";
-      default: return severity;
-    }
-  };
-
   const getWaterLevelCellStyle = (level: number) => {
     if (level < 20) return "bg-red-100 text-red-800 font-bold";
     if (level > 80) return "bg-orange-100 text-orange-800 font-bold";
     return "";
   };
-
   const getFlowRateCellStyle = (flowRate: number) => {
     if (flowRate === 0 || flowRate > 50) return "bg-yellow-100 text-yellow-800 font-bold";
     return "";
   };
-
   const getMotorStatusStyle = (status: string) => {
-    return status === "operating"
-      ? "bg-green-100 text-green-800 font-medium"
-      : "bg-red-100 text-red-800 font-medium";
+    return status === "operating" ? "bg-green-100 text-green-800 font-medium" : "bg-red-100 text-red-800 font-medium";
   };
 
-  const filteredFields = waterLevelData.filter(field =>
+  const filteredFields = waterLevelData.filter((field) =>
     field.site.toLowerCase().includes(fieldSearchQuery.toLowerCase())
   );
 
   const sortedFields = [...filteredFields].sort((a, b) => {
     if (!sortColumn) return 0;
-
-    let aValue = a[sortColumn as keyof typeof a];
-    let bValue = b[sortColumn as keyof typeof b];
-
+    let aValue = a[sortColumn as keyof typeof a] as any;
+    let bValue = b[sortColumn as keyof typeof b] as any;
     if (typeof aValue === "string") {
       aValue = aValue.toLowerCase();
       bValue = (bValue as string).toLowerCase();
     }
-
-    if (sortDirection === "asc") {
-      return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-    } else {
-      return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-    }
+    if (sortDirection === "asc") return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+    return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
   });
 
   const handleSort = (column: string) => {
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
+    if (sortColumn === column) setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    else {
       setSortColumn(column);
       setSortDirection("asc");
     }
@@ -283,49 +213,85 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Droplets className="h-8 w-8 text-blue-600" />
-              <h1 className="text-2xl font-bold text-gray-900">수질 모니터링</h1>
-          </div>
-          <Badge variant="outline" className="ml-4">실시간 현황</Badge>
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="사업장명으로 검색"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-64"
-              />
+      {/* Header (Sticky) */}
+      <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+        <div className="mx-auto max-w-7xl px-4 md:px-10 py-4 flex items-center justify-between">
+          {/* Left: Logo/Title (navigate to /sites) */}
+          <button
+            className="flex items-center space-x-3 group"
+            aria-label="현장 관리로 이동"
+            title="현장 관리로 이동"
+          >
+            <Droplets className="h-9 w-9 text-blue-600 group-hover:scale-105 transition-transform" />
+            <div className="flex items-baseline gap-2">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight group-hover:opacity-90">
+                수질 모니터링
+              </h1>
+              <Badge variant="outline" className="px-2 py-0.5 text-[10px] sm:text-xs">실시간 현황</Badge>
             </div>
-            <Button variant="outline" size="icon">
-              <Bell className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon">
-              <Settings className="h-4 w-4" />
-            </Button>
+          </button>
+
+          {/* Center: Nav tabs (responsive font size & spacing) */}
+          <nav className="hidden md:flex items-center gap-12 md:gap-24 lg:gap-36">
+            <NavLink
+              to="/sites"
+              end
+              className={({ isActive }) =>
+                `font-semibold tracking-wide transition-colors
+                 text-sm sm:text-base md:text-lg
+                 ${isActive ? "text-gray-900" : "text-gray-600 hover:text-gray-900"}`
+              }
+            >
+              현장 관리
+            </NavLink>
+            <NavLink
+              to="/statistics"
+              end
+              className={({ isActive }) =>
+                `font-semibold tracking-wide transition-colors
+                 text-sm sm:text-base md:text-lg
+                 ${isActive ? "text-gray-900" : "text-gray-600 hover:text-gray-900"}`
+              }
+            >
+              통계
+            </NavLink>
+            <NavLink
+              to="/settings"
+              end
+              className={({ isActive }) =>
+                `font-semibold tracking-wide transition-colors
+                 text-sm sm:text-base md:text-lg
+                 ${isActive ? "text-gray-900" : "text-gray-600 hover:text-gray-900"}`
+              }
+            >
+              마이페이지
+            </NavLink>
+          </nav>
+
+          {/* Right: Settings & Logout */}
+          <div className="flex items-center space-x-2">
             <Button
               variant="outline"
               size="icon"
-              onClick={handleLogout}
-              title="로그아웃"
+              onClick={() => navigate("/settings")}
+              title="설정"
+              aria-label="설정으로 이동"
             >
-              <LogOut className="h-4 w-4" />
+              <Settings className="h-5 w-5" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={handleLogout} title="로그아웃">
+              <LogOut className="h-5 w-5" />
             </Button>
           </div>
         </div>
       </header>
 
-      <div className="p-6 space-y-6">
+      {/* Body */}
+      <div className="mx-auto max-w-7xl p-6 space-y-6">
         {/* Site Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card>
+          {/* Total Sites */}
+          <Card className="cursor-default">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">전체 현장</CardTitle>
               <MapPin className="h-4 w-4 text-muted-foreground" />
@@ -336,7 +302,8 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          {/* Active Sites (open dialog) */}
+          <Card onClick={() => setOpenActive(true)} className="cursor-pointer">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">활성 현장</CardTitle>
               <CheckCircle className="h-4 w-4 text-green-600" />
@@ -347,7 +314,8 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          {/* Alert Sites (open dialog) */}
+          <Card onClick={() => setOpenAlert(true)} className="cursor-pointer">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">경고 현장</CardTitle>
               <AlertTriangle className="h-4 w-4 text-yellow-600" />
@@ -358,7 +326,8 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          {/* System Efficiency */}
+          <Card className="cursor-default">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">시스템 효율성</CardTitle>
               <TrendingUp className="h-4 w-4 text-blue-600" />
@@ -369,6 +338,67 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Active / Alert Dialogs */}
+        <Dialog open={openActive} onOpenChange={setOpenActive}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>활성 현장 목록</DialogTitle>
+            </DialogHeader>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>현장명</TableHead>
+                  <TableHead>수위(%)</TableHead>
+                  <TableHead>유량(L/min)</TableHead>
+                  <TableHead>모터1</TableHead>
+                  <TableHead>모터2</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {waterLevelData
+                  .filter((f) => f.flowRate > 0)
+                  .map((f) => (
+                    <TableRow key={f.id}>
+                      <TableCell>{f.site}</TableCell>
+                      <TableCell>{f.level}</TableCell>
+                      <TableCell>{f.flowRate.toFixed(1)}</TableCell>
+                      <TableCell>{f.motor1Status === "operating" ? "작동중" : "정지"}</TableCell>
+                      <TableCell>{f.motor2Status === "operating" ? "작동중" : "정지"}</TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={openAlert} onOpenChange={setOpenAlert}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>경고 현장 목록</DialogTitle>
+            </DialogHeader>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>현장명</TableHead>
+                  <TableHead>경고내용</TableHead>
+                  <TableHead>심각도</TableHead>
+                  <TableHead>시간</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {alertData.map((a) => (
+                  <TableRow key={a.id}>
+                    <TableCell>{a.site}</TableCell>
+                    <TableCell>{a.message}</TableCell>
+                    <TableCell>{a.severity}</TableCell>
+                    <TableCell>{a.time}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </DialogContent>
+        </Dialog>
 
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -402,38 +432,15 @@ export default function Dashboard() {
                 <div>
                   <h4 className="text-sm font-medium mb-3 text-gray-700">수위 (%)</h4>
                   <ChartContainer
-                    config={{
-                      level: { label: "수위", color: "#3b82f6" }
-                    }}
+                    config={{ level: { label: "수위", color: "#3b82f6" } }}
                     className="h-48"
                   >
-                    <LineChart data={favoriteFieldData[selectedFavoriteField]?.waterLevel || []}>
+                    <LineChart data={(favoriteFieldData as any)[selectedFavoriteField]?.waterLevel || []}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis
-                        dataKey="time"
-                        axisLine={true}
-                        tickLine={true}
-                        tick={true}
-                        orientation="bottom"
-                        type="category"
-                      />
-                      <YAxis
-                        axisLine={true}
-                        tickLine={true}
-                        tick={true}
-                        orientation="left"
-                        type="number"
-                        domain={[0, 100]}
-                      />
+                      <XAxis dataKey="time" axisLine tickLine tick orientation="bottom" type="category" />
+                      <YAxis axisLine tickLine tick orientation="left" type="number" domain={[0, 100]} />
                       <ChartTooltip content={<ChartTooltipContent />} />
-                      <Line
-                        type="monotone"
-                        dataKey="level"
-                        stroke="#3b82f6"
-                        strokeWidth={2}
-                        dot={{ r: 3 }}
-                        activeDot={{ r: 5 }}
-                      />
+                      <Line type="monotone" dataKey="level" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
                     </LineChart>
                   </ChartContainer>
                 </div>
@@ -442,38 +449,15 @@ export default function Dashboard() {
                 <div>
                   <h4 className="text-sm font-medium mb-3 text-gray-700">유량 (L/min)</h4>
                   <ChartContainer
-                    config={{
-                      flow: { label: "유량", color: "#10b981" }
-                    }}
+                    config={{ flow: { label: "유량", color: "#10b981" } }}
                     className="h-48"
                   >
-                    <LineChart data={favoriteFieldData[selectedFavoriteField]?.flowRate || []}>
+                    <LineChart data={(favoriteFieldData as any)[selectedFavoriteField]?.flowRate || []}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis
-                        dataKey="time"
-                        axisLine={true}
-                        tickLine={true}
-                        tick={true}
-                        orientation="bottom"
-                        type="category"
-                      />
-                      <YAxis
-                        axisLine={true}
-                        tickLine={true}
-                        tick={true}
-                        orientation="left"
-                        type="number"
-                        domain={[0, 'dataMax']}
-                      />
+                      <XAxis dataKey="time" axisLine tickLine tick orientation="bottom" type="category" />
+                      <YAxis axisLine tickLine tick orientation="left" type="number" domain={[0, "dataMax"]} />
                       <ChartTooltip content={<ChartTooltipContent />} />
-                      <Line
-                        type="monotone"
-                        dataKey="flow"
-                        stroke="#10b981"
-                        strokeWidth={2}
-                        dot={{ r: 3 }}
-                        activeDot={{ r: 5 }}
-                      />
+                      <Line type="monotone" dataKey="flow" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
                     </LineChart>
                   </ChartContainer>
                 </div>
@@ -518,189 +502,122 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Water Level and Alerts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Real-time Data Summary by Site */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Gauge className="h-5 w-5" />
-                  현장별 실시간 데이터 요약
-                </CardTitle>
-                <div className="flex items-center space-x-2">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      placeholder="현장명 검색"
-                      value={fieldSearchQuery}
-                      onChange={(e) => setFieldSearchQuery(e.target.value)}
-                      className="pl-10 w-48"
-                    />
-                  </div>
-                  <Badge variant="secondary">
-                    {filteredFields.length}개 현장
-                  </Badge>
+        {/* Real-time Summary by Site */}
+        <Card className="[text-size-adjust:100%]">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Gauge className="h-5 w-5" />
+                현장별 실시간 데이터 요약
+              </CardTitle>
+              <div className="flex items-center space-x-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder="현장명 검색"
+                    value={fieldSearchQuery}
+                    onChange={(e) => setFieldSearchQuery(e.target.value)}
+                    className="pl-10 w-56 text-[15px] leading-6"
+                  />
                 </div>
+                <Badge variant="secondary">
+                  {filteredFields.length}개 현장
+                </Badge>
               </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table className="min-w-[880px] text-[15px] leading-6">
                 <TableHeader>
                   <TableRow>
                     <TableHead
-                      className="cursor-pointer hover:bg-gray-50"
+                      className="cursor-pointer whitespace-nowrap"
                       onClick={() => handleSort("site")}
                     >
                       현장명
-                      {sortColumn === "site" && (
-                        <span className="ml-1">
-                          {sortDirection === "asc" ? "↑" : "↓"}
-                        </span>
-                      )}
+                      {sortColumn === "site" && <span className="ml-1">{sortDirection === "asc" ? "↑" : "↓"}</span>}
                     </TableHead>
                     <TableHead
-                      className="cursor-pointer hover:bg-gray-50"
+                      className="cursor-pointer whitespace-nowrap text-right"
                       onClick={() => handleSort("level")}
                     >
                       수위 (%)
-                      {sortColumn === "level" && (
-                        <span className="ml-1">
-                          {sortDirection === "asc" ? "↑" : "↓"}
-                        </span>
-                      )}
+                      {sortColumn === "level" && <span className="ml-1">{sortDirection === "asc" ? "↑" : "↓"}</span>}
                     </TableHead>
                     <TableHead
-                      className="cursor-pointer hover:bg-gray-50"
+                      className="cursor-pointer whitespace-nowrap text-right"
                       onClick={() => handleSort("flowRate")}
                     >
                       유량 (L/min)
-                      {sortColumn === "flowRate" && (
-                        <span className="ml-1">
-                          {sortDirection === "asc" ? "↑" : "↓"}
-                        </span>
-                      )}
+                      {sortColumn === "flowRate" && <span className="ml-1">{sortDirection === "asc" ? "↑" : "↓"}</span>}
                     </TableHead>
-                    <TableHead>모터 1</TableHead>
-                    <TableHead>모터 2</TableHead>
-                    <TableHead>상세정보</TableHead>
+                    <TableHead className="whitespace-nowrap">모터 1</TableHead>
+                    <TableHead className="whitespace-nowrap">모터 2</TableHead>
+                    <TableHead className="whitespace-nowrap">상세정보</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sortedFields.map((field) => (
                     <TableRow key={field.id} className="hover:bg-gray-50">
-                      <TableCell className="font-medium">
+                      <TableCell className="whitespace-nowrap font-medium">
                         <div className="flex items-center space-x-2">
-                          <span>{field.site}</span>
+                          <span className="whitespace-nowrap">{field.site}</span>
                           <Badge
-                          variant={field.status === "normal" ? "secondary" : field.status === "high" ? "default" : "destructive"}
-                          className="text-xs"
-                        >
-                          {field.status === "normal" ? "정상" : field.status === "high" ? "높음" : field.status === "low" ? "낮음" : field.status}
-                        </Badge>
+                            variant={field.status === "normal" ? "secondary" : field.status === "high" ? "default" : "destructive"}
+                            className="text-[11px] py-0.5 px-2 shrink-0"
+                          >
+                            {field.status === "normal" ? "정상" : field.status === "high" ? "높음" : field.status === "low" ? "낮음" : field.status}
+                          </Badge>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded ${getWaterLevelCellStyle(field.level)}`}>
-                          {field.level}%
-                        </span>
+                      <TableCell className="whitespace-nowrap text-right">
+                        <span className={`inline-block px-2 py-1 rounded ${getWaterLevelCellStyle(field.level)}`}>{field.level}%</span>
                       </TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded ${getFlowRateCellStyle(field.flowRate)}`}>
-                          {field.flowRate.toFixed(1)}
-                        </span>
+                      <TableCell className="whitespace-nowrap text-right">
+                        <span className={`inline-block px-2 py-1 rounded ${getFlowRateCellStyle(field.flowRate)}`}>{field.flowRate.toFixed(1)}</span>
                       </TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded text-sm ${getMotorStatusStyle(field.motor1Status)}`}>
+                      <TableCell className="whitespace-nowrap">
+                        <span className={`inline-block px-2 py-1 rounded text-sm ${getMotorStatusStyle(field.motor1Status)}`}>
                           {field.motor1Status === "operating" ? "작동중" : "정지"}
                         </span>
                       </TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded text-sm ${getMotorStatusStyle(field.motor2Status)}`}>
+                      <TableCell className="whitespace-nowrap">
+                        <span className={`inline-block px-2 py-1 rounded text-sm ${getMotorStatusStyle(field.motor2Status)}`}>
                           {field.motor2Status === "operating" ? "작동중" : "정지"}
                         </span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <Button size="sm" variant="outline" asChild>
-                          <Link to={`/sites/${field.id}`}>
-                            상세보기
-                          </Link>
+                          <Link to={`/sites/${field.id}`}>상세보기</Link>
                         </Button>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+            </div>
 
-              {/* Legend for conditional styling */}
-              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                <h4 className="text-sm font-medium mb-2">상태 표시기:</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
-                    <span>수위: 위험 (&lt;20% 또는 &gt;80%)</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 bg-yellow-100 border border-yellow-300 rounded"></div>
-                    <span>유량: 비정상 (0 또는 &gt;50 L/min)</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
-                    <span>모터: 작동중</span>
-                  </div>
+            {/* Legend */}
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+              <h4 className="text-sm font-medium mb-2">상태 표시기:</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
+                  <span>수위: 위험 (&lt;20% 또는 &gt;80%)</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-yellow-100 border border-yellow-300 rounded"></div>
+                  <span>유량: 비정상 (0 또는 &gt;50 L/min)</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
+                  <span>모터: 작동중</span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Recent Alerts */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                최근 알림
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {alerts.map((alert) => (
-                  <div key={alert.id} className="flex items-start space-x-3 p-3 border rounded-lg relative group">
-                    <div className={`w-2 h-2 rounded-full mt-2 ${getSeverityColor(alert.severity)}`} />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-medium">{alert.site}</h4>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={getSeverityBadge(alert.severity) as any}>
-                            {getSeverityText(alert.severity)}
-                          </Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-100"
-                            onClick={() => dismissAlert(alert.id)}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">{alert.message}</p>
-                      <div className="flex items-center text-xs text-gray-500 mt-1">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {alert.time}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {alerts.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>새로운 알림이 없습니다</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Abnormal Fields */}
         <Card>

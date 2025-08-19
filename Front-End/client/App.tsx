@@ -21,6 +21,8 @@ import AuthExample from "./components/AuthExample";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
+
+
 const queryClient = new QueryClient();
 
 const App = () => (
