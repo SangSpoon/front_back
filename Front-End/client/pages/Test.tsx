@@ -22,6 +22,7 @@ import {
   Zap,
   Waves
 } from "lucide-react";
+import HeaderNav from "@/components/Header";
 
 interface SensorData {
   id: number;
@@ -1034,6 +1035,7 @@ export default function Test() {
             <p className="text-gray-600">상수도 관리 시스템 실시간 데이터</p>
           </div>
         </div>
+         <HeaderNav />
         <div className="flex items-center gap-2">
           <Badge variant="default">
             <Database className="h-3 w-3 mr-1" />
