@@ -186,28 +186,34 @@ export default function SiteDetails() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
+          {/* Left: Back button and Site Info */}
           <div className="flex items-center space-x-4">
             <Link to="/dashboard">
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" title="대시보드로 돌아가기">
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             </Link>
             <div className="flex items-center space-x-2">
               <MapPin className="h-6 w-6 text-blue-600" />
-              <h1 className="text-3xl font-bold text-gray-900">{site.name} 상세정보</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{site.name} 상세정보</h1>
             </div>
-            <Badge variant="outline" className="text-lg px-3 py-1">
+            <Badge variant="outline" className="text-sm sm:text-lg px-2 sm:px-3 py-1">
               {site.managementNumber}
             </Badge>
           </div>
 
-          <HeaderNav />
+          {/* Center: Navigation */}
+          <div className="flex-1 flex justify-center">
+            <HeaderNav />
+          </div>
 
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
-            <Clock className="h-4 w-4" />
-            <span>마지막 업데이트: {lastRefresh.toLocaleTimeString('ko-KR', { hour12: false })}</span>
-            <Button variant="ghost" size="sm" onClick={() => setLastRefresh(new Date())}>
-              <RefreshCw className="h-4 w-4" />
+          {/* Right: Update Info */}
+          <div className="flex items-center space-x-2 text-xs sm:text-sm text-gray-600">
+            <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">마지막 업데이트: {lastRefresh.toLocaleTimeString('ko-KR', { hour12: false })}</span>
+            <span className="sm:hidden">{lastRefresh.toLocaleTimeString('ko-KR', { hour12: false })}</span>
+            <Button variant="ghost" size="sm" onClick={() => setLastRefresh(new Date())} title="새로고침">
+              <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
           </div>
         </div>
