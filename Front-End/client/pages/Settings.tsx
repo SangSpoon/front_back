@@ -16,6 +16,7 @@ import {
   Database,
   Save
 } from "lucide-react";
+import HeaderNav from "@/components/Header";
 
 export default function Settings() {
   const [notifications, setNotifications] = useState({
@@ -81,6 +82,9 @@ export default function Settings() {
             <Badge variant="outline">시스템 구성</Badge>
           </div>
           
+                <HeaderNav />
+          
+
           <Button onClick={handleSave}>
             <Save className="h-4 w-4 mr-2" />
             변경사항 저장

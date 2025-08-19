@@ -20,6 +20,7 @@ import {
   Zap
 } from "lucide-react";
 import { apiClient, type SiteResponse } from "@/lib/api";
+import HeaderNav from "@/components/Header";
 
 // 통계 페이지에서 사용할 센서 데이터 타입
 interface SensorData {
@@ -163,6 +164,8 @@ export default function Statistics() {
             </div>
             <Badge variant="outline">데이터 분석</Badge>
           </div>
+
+          <HeaderNav />
           
           <div />
         </div>

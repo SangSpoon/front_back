@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { apiClient, type CreateOrUpdateSiteRequest, type SiteResponse } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import HeaderNav from "@/components/Header";
 
 interface Site {
   id: string;
@@ -60,8 +61,8 @@ function mapSite(resp: SiteResponse): Site {
   const status = resp.status?.toLowerCase() === "inactive"
     ? "inactive"
     : resp.status?.toLowerCase() === "maintenance"
-    ? "maintenance"
-    : "active";
+      ? "maintenance"
+      : "active";
   return {
     id: resp.managementCode,
     name: resp.siteName,
@@ -704,7 +705,7 @@ export default function SiteManagement() {
           </TableHeader>
           <TableBody>
             {filteredSites.map((site) => (
-              <TableRow 
+              <TableRow
                 key={site.id}
                 className={`${selectedSite?.id === site.id ? 'bg-blue-50' : ''} hover:bg-gray-50`}
                 onClick={() => setSelectedSite(site)}
@@ -822,7 +823,9 @@ export default function SiteManagement() {
             </div>
             <Badge variant="outline">CRUD 운영</Badge>
           </div>
-          
+
+          <HeaderNav />
+
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button>

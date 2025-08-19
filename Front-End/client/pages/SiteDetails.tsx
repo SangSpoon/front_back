@@ -15,6 +15,7 @@ import {
   Clock,
   RefreshCw
 } from "lucide-react";
+import HeaderNav from "@/components/Header";
 
 // Sample site data - in real app this would come from API based on ID
 const siteData = {
@@ -66,7 +67,7 @@ const siteData = {
 const generateTimeSeriesData = (period: string) => {
   const baseWaterLevel = 161;
   const baseFlowRate = 10.660;
-  
+
   switch (period) {
     case "1h":
       return Array.from({ length: 12 }, (_, i) => ({
@@ -74,7 +75,7 @@ const generateTimeSeriesData = (period: string) => {
         waterLevel: baseWaterLevel + (Math.random() - 0.5) * 10,
         flowRate: baseFlowRate + (Math.random() - 0.5) * 2
       }));
-    case "6h": 
+    case "6h":
       return Array.from({ length: 12 }, (_, i) => ({
         time: `${String(i * 30 / 60).padStart(2, '0')}:${String((i * 30) % 60).padStart(2, '0')}`,
         waterLevel: baseWaterLevel + (Math.random() - 0.5) * 15,
@@ -199,7 +200,9 @@ export default function SiteDetails() {
               {site.managementNumber}
             </Badge>
           </div>
-          
+
+          <HeaderNav />
+
           <div className="flex items-center space-x-2 text-sm text-gray-600">
             <Clock className="h-4 w-4" />
             <span>마지막 업데이트: {lastRefresh.toLocaleTimeString('ko-KR', { hour12: false })}</span>
@@ -345,20 +348,20 @@ export default function SiteDetails() {
                   <div>
                     <h4 className="font-medium mb-3 text-blue-600">물탱크 수위 변화 (%)</h4>
                     <ChartContainer
-                    config={{
-                      waterLevel: { label: "수위 (%)", color: "#3b82f6" }
-                    }}
-                    className="h-64"
-                  >
+                      config={{
+                        waterLevel: { label: "수위 (%)", color: "#3b82f6" }
+                      }}
+                      className="h-64"
+                    >
                       <LineChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis 
-                          dataKey="time" 
+                        <XAxis
+                          dataKey="time"
                           axisLine={true}
                           tickLine={true}
                           tick={true}
                         />
-                        <YAxis 
+                        <YAxis
                           axisLine={true}
                           tickLine={true}
                           tick={true}
@@ -410,20 +413,20 @@ export default function SiteDetails() {
                   <div>
                     <h4 className="font-medium mb-3 text-green-600">유량 변화 (L/min)</h4>
                     <ChartContainer
-                    config={{
-                      flowRate: { label: "유량 (L/min)", color: "#10b981" }
-                    }}
-                    className="h-64"
-                  >
+                      config={{
+                        flowRate: { label: "유량 (L/min)", color: "#10b981" }
+                      }}
+                      className="h-64"
+                    >
                       <LineChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis 
-                          dataKey="time" 
+                        <XAxis
+                          dataKey="time"
                           axisLine={true}
                           tickLine={true}
                           tick={true}
                         />
-                        <YAxis 
+                        <YAxis
                           axisLine={true}
                           tickLine={true}
                           tick={true}

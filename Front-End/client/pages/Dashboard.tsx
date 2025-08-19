@@ -24,6 +24,7 @@ import {
   Settings
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import HeaderNav from "@/components/Header";
 
 // Sample data for demonstration
 const fieldOverviewData = {
@@ -231,44 +232,9 @@ export default function Dashboard() {
             </div>
           </button>
 
-          {/* Center: Nav tabs (responsive font size & spacing) */}
-          <nav className="hidden md:flex items-center gap-12 md:gap-24 lg:gap-36">
-            <NavLink
-              to="/sites"
-              end
-              className={({ isActive }) =>
-                `font-semibold tracking-wide transition-colors
-                 text-sm sm:text-base md:text-lg
-                 ${isActive ? "text-gray-900" : "text-gray-600 hover:text-gray-900"}`
-              }
-            >
-              현장 관리
-            </NavLink>
-            <NavLink
-              to="/statistics"
-              end
-              className={({ isActive }) =>
-                `font-semibold tracking-wide transition-colors
-                 text-sm sm:text-base md:text-lg
-                 ${isActive ? "text-gray-900" : "text-gray-600 hover:text-gray-900"}`
-              }
-            >
-              통계
-            </NavLink>
-            <NavLink
-              to="/settings"
-              end
-              className={({ isActive }) =>
-                `font-semibold tracking-wide transition-colors
-                 text-sm sm:text-base md:text-lg
-                 ${isActive ? "text-gray-900" : "text-gray-600 hover:text-gray-900"}`
-              }
-            >
-              마이페이지
-            </NavLink>
-          </nav>
+              {/* 가운데 및 오른쪽: 공용 내비게이션 컴포넌트 */}
+      <HeaderNav />
 
-          {/* Right: Settings & Logout */}
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
