@@ -6,12 +6,14 @@ import com.smhrd.sangspoon.sensor.repository.SensorDataRepository;
 import com.smhrd.sangspoon.sensor.repository.ParsedDataRepository;
 import com.smhrd.sangspoon.site.entity.SiteEntity;
 import com.smhrd.sangspoon.site.repository.SiteRepository;
+import com.smhrd.sangspoon.service.EmailAlertService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
@@ -29,6 +31,9 @@ public class SensorDataScheduler {
     
     @Autowired
     private SensorDataService sensorDataService;
+
+    @Autowired
+    private EmailAlertService emailAlertService;
 
     private final Random random = new Random();
     private boolean isRunning = false;
@@ -95,8 +100,18 @@ public class SensorDataScheduler {
     }
 
     private String generateRandomRawData(String siteId) {
-        // 물탱크 수위 (이전 값 기반 점진적 변화) - 현실적인 범위로 조정
-        float waterLevelChange = (random.nextFloat() - 0.5f) * 3.0f; // -1.5 ~ +1.5
+        // 99% vs 1% 확률 결정
+        double probability = random.nextDouble();
+        
+        // 물탱크 수위 (이전 값 기반 점진적 변화)
+        float waterLevelChange;
+        if (probability < 0.5) {
+            // 99% 확률: 작은 변화 (-1.5 ~ +1.5)
+            waterLevelChange = (random.nextFloat() - 0.5f) * 3.0f;
+        } else {
+            // 1% 확률: 큰 변화 (-15 ~ +15)
+            waterLevelChange = (random.nextFloat() - 0.5f) * 30.0f;
+        }
         
         // 기존 값이 너무 낮으면 강제로 높은 범위로 조정
         if (previousWaterLevel < 50.0f) {
@@ -108,13 +123,29 @@ public class SensorDataScheduler {
         String waterHex = String.format("%02x", Math.round(newWaterLevel));
         
         // 약품 레벨 (이전 값 기반 점진적 변화)
-        float chemicalLevelChange = (random.nextFloat() - 0.5f) * 3.0f; // -1.5 ~ +1.5
+        float chemicalLevelChange;
+        if (probability < 0.5) {
+            // 99% 확률: 작은 변화 (-1.5 ~ +1.5)
+            chemicalLevelChange = (random.nextFloat() - 0.5f) * 3.0f;
+        } else {
+            // 1% 확률: 큰 변화 (-15 ~ +15)
+            chemicalLevelChange = (random.nextFloat() - 0.5f) * 30.0f;
+        }
+        
         float newChemicalLevel = Math.max(10.0f, Math.min(80.0f, previousChemicalLevel + chemicalLevelChange));
         previousChemicalLevel = newChemicalLevel;
         String chemicalHex = String.format("%02x", Math.round(newChemicalLevel));
         
-        // 유량 (이전 값 기반 점진적 변화, 현실적인 범위)
-        float flowRateChange = (random.nextFloat() - 0.5f) * 2.0f; // -1.0 ~ +1.0 L/min
+        // 유량 (이전 값 기반 점진적 변화)
+        float flowRateChange;
+        if (probability < 0.5) {
+            // 99% 확률: 작은 변화 (-1.0 ~ +1.0 L/min)
+            flowRateChange = (random.nextFloat() - 0.5f) * 2.0f;
+        } else {
+            // 1% 확률: 큰 변화 (-10 ~ +10 L/min)
+            flowRateChange = (random.nextFloat() - 0.5f) * 20.0f;
+        }
+        
         float newFlowRate = Math.max(5.0f, Math.min(45.0f, previousFlowRate + flowRateChange));
         previousFlowRate = newFlowRate;
         String flowRateHex = floatToHex(newFlowRate);
@@ -126,6 +157,39 @@ public class SensorDataScheduler {
         // 누적 총량 (점진적 증가) - 분당 유량을 그대로 누적
         cumulativeTotal += Math.round(newFlowRate);
         String totalAmountHex = String.format("%08x", cumulativeTotal);
+        
+        // 🚨 큰 변화 발생 시 이메일 알림 전송
+        if (probability >= 0.99) {
+            // 어떤 센서에서 큰 변화가 발생했는지 확인
+            List<String> alertSensors = new ArrayList<>();
+            if (Math.abs(waterLevelChange) > 10) {
+                alertSensors.add("수위");
+            }
+            if (Math.abs(chemicalLevelChange) > 10) {
+                alertSensors.add("약품");
+            }
+            if (Math.abs(flowRateChange) > 10) {
+                alertSensors.add("유량");
+            }
+            
+            String alertReason = String.join(", ", alertSensors);
+            
+            System.out.println("🚨 큰 변화 발생! (1% 확률) - 원인: " + alertReason);
+            System.out.println("  수위 변화: " + waterLevelChange + "%");
+            System.out.println("  약품 변화: " + chemicalLevelChange + "%");
+            System.out.println("  유량 변화: " + flowRateChange + " L/min");
+            
+            // 이메일 알림 전송
+            emailAlertService.sendLargeChangeAlert(
+                siteId, 
+                waterLevelChange, 
+                chemicalLevelChange, 
+                flowRateChange,
+                newWaterLevel, 
+                newChemicalLevel, 
+                newFlowRate
+            );
+        }
         
         // Raw data 문자열 조합
         String rawData = String.format("%sWATER%sCHEMICAL%sMAIN%s%s%s",
