@@ -21,11 +21,15 @@ import {
   TrendingUp,
   Zap,
   Droplets,
-  X
+  X,
+  FileText,
+  Download
 } from "lucide-react";
 import { apiClient, type CreateOrUpdateSiteRequest, type SiteResponse } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import HeaderNav from "@/components/Header";
+
+// 인쇄용 스타일은 별도 페이지에서 처리됩니다
 
 interface Site {
   id: string;
@@ -78,6 +82,154 @@ function mapSite(resp: SiteResponse): Site {
     total: 0,
     status,
   };
+}
+
+
+
+// PDF 컴포넌트들은 별도 페이지로 이동했습니다
+
+// PDF 컴포넌트들은 별도 페이지로 이동했습니다
+
+// 전체 현장 통합 그래프 컴포넌트 (인쇄용)
+function AllSitesGraphs({ sites, sensorData }: { sites: Site[]; sensorData: SensorData[] }) {
+  const now = new Date().getTime();
+  const recentData = sensorData.filter(d => now - new Date(d.createdAt).getTime() <= 24 * 60 * 60 * 1000);
+  
+  // 모든 현장의 데이터를 시간별로 그룹화
+  const timeGroups: Record<string, { waterLevel: number; flowRate: number; count: number }> = {};
+  
+  recentData.forEach(d => {
+    const timeKey = new Date(d.createdAt).toISOString().slice(0, 13); // 시간별 그룹화
+    if (!timeGroups[timeKey]) {
+      timeGroups[timeKey] = { waterLevel: 0, flowRate: 0, count: 0 };
+    }
+    timeGroups[timeKey].waterLevel += d.waterLevel;
+    timeGroups[timeKey].flowRate += d.flowRate;
+    timeGroups[timeKey].count += 1;
+  });
+
+  // 평균값 계산 및 시간순 정렬
+  const averagedData = Object.entries(timeGroups)
+    .map(([time, data]) => ({
+      time: new Date(time),
+      waterLevel: data.waterLevel / data.count,
+      flowRate: data.flowRate / data.count
+    }))
+    .sort((a, b) => a.time.getTime() - b.time.getTime());
+
+  const maxFlowRate = Math.max(1, ...averagedData.map(d => d.flowRate));
+
+  return (
+    <div className="space-y-6">
+      {/* 수위 변화 그래프 */}
+      <div className="bg-white p-4 rounded-lg border">
+        <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">전체 현장 24시간 평균 수위 변화 (%)</h3>
+        <div className="h-48 relative">
+          {averagedData.length > 1 ? (
+            <svg className="w-full h-full" viewBox="0 0 800 240">
+              {/* 축/눈금 */}
+              <line x1="0" y1="0" x2="0" y2="200" stroke="#e5e7eb" strokeWidth="1" />
+              <line x1="0" y1="0" x2="800" y2="0" stroke="#e5e7eb" strokeWidth="1" />
+              <line x1="0" y1="50" x2="800" y2="50" stroke="#e5e7eb" strokeWidth="0.5" />
+              <line x1="0" y1="100" x2="800" y2="100" stroke="#e5e7eb" strokeWidth="0.5" />
+              <line x1="0" y1="150" x2="800" y2="150" stroke="#e5e7eb" strokeWidth="0.5" />
+              
+              {/* Y 라벨 */}
+              <text x="5" y="15" fontSize="12" fill="#6b7280">100%</text>
+              <text x="5" y="65" fontSize="12" fill="#6b7280">75%</text>
+              <text x="5" y="115" fontSize="12" fill="#6b7280">50%</text>
+              <text x="5" y="165" fontSize="12" fill="#6b7280">25%</text>
+
+              {/* 수위 그래프 */}
+              {averagedData.map((pt, idx) => {
+                if (idx === 0) return null;
+                const cx = 50 + (idx / (averagedData.length - 1)) * 700;
+                const px = 50 + ((idx - 1) / (averagedData.length - 1)) * 700;
+                const cy = 200 - (pt.waterLevel / 100) * 200;
+                const py = 200 - (averagedData[idx - 1].waterLevel / 100) * 200;
+                return (
+                  <g key={`water-${idx}`}>
+                    <line x1={px} y1={py} x2={cx} y2={cy} stroke="#3b82f6" strokeWidth="2" />
+                    <circle cx={cx} cy={cy} r="3" fill="#3b82f6" />
+                  </g>
+                );
+              })}
+
+              {/* X축 시간 라벨 */}
+              {averagedData.map((pt, idx) => {
+                if (idx % 3 !== 0) return null; // 3시간 간격으로 라벨 표시
+                const x = 50 + (idx / (averagedData.length - 1)) * 700;
+                return (
+                  <g key={`time-${idx}`}>
+                    <line x1={x} y1="0" x2={x} y2="200" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
+                    <text x={x} y="220" fontSize="10" fill="#6b7280" textAnchor="middle">
+                      {String(pt.time.getHours()).padStart(2, '0')}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+          ) : (
+            <div className="flex items-center justify-center h-full text-gray-400">데이터가 없습니다</div>
+          )}
+        </div>
+      </div>
+
+      {/* 유량 변화 그래프 */}
+      <div className="bg-white p-4 rounded-lg border">
+        <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">전체 현장 24시간 평균 유량 변화 (L/min)</h3>
+        <div className="h-48 relative">
+          {averagedData.length > 1 ? (
+            <svg className="w-full h-full" viewBox="0 0 800 240">
+              {/* 축/눈금 */}
+              <line x1="0" y1="0" x2="0" y2="200" stroke="#e5e7eb" strokeWidth="1" />
+              <line x1="0" y1="0" x2="800" y2="0" stroke="#e5e7eb" strokeWidth="1" />
+              <line x1="0" y1="50" x2="800" y2="50" stroke="#e5e7eb" strokeWidth="0.5" />
+              <line x1="0" y1="100" x2="800" y2="100" stroke="#e5e7eb" strokeWidth="0.5" />
+              <line x1="0" y1="150" x2="800" y2="150" stroke="#e5e7eb" strokeWidth="0.5" />
+              
+              {/* Y 라벨 */}
+              <text x="5" y="15" fontSize="12" fill="#6b7280">{maxFlowRate.toFixed(0)} L/min</text>
+              <text x="5" y="65" fontSize="12" fill="#6b7280">{(maxFlowRate * 0.75).toFixed(0)} L/min</text>
+              <text x="5" y="115" fontSize="12" fill="#6b7280">{(maxFlowRate * 0.5).toFixed(0)} L/min</text>
+              <text x="5" y="165" fontSize="12" fill="#6b7280">{(maxFlowRate * 0.25).toFixed(0)} L/min</text>
+
+              {/* 유량 그래프 */}
+              {averagedData.map((pt, idx) => {
+                if (idx === 0) return null;
+                const cx = 50 + (idx / (averagedData.length - 1)) * 700;
+                const px = 50 + ((idx - 1) / (averagedData.length - 1)) * 700;
+                const cy = 200 - (pt.flowRate / maxFlowRate) * 200;
+                const py = 200 - (averagedData[idx - 1].flowRate / maxFlowRate) * 200;
+                return (
+                  <g key={`flow-${idx}`}>
+                    <line x1={px} y1={py} x2={cx} y2={cy} stroke="#10b981" strokeWidth="2" />
+                    <circle cx={cx} cy={cy} r="3" fill="#10b981" />
+                  </g>
+                );
+              })}
+
+              {/* X축 시간 라벨 */}
+              {averagedData.map((pt, idx) => {
+                if (idx % 3 !== 0) return null; // 3시간 간격으로 라벨 표시
+                const x = 50 + (idx / (averagedData.length - 1)) * 700;
+                return (
+                  <g key={`timef-${idx}`}>
+                    <line x1={x} y1="0" x2={x} y2="200" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
+                    <text x={x} y="220" fontSize="10" fill="#6b7280" textAnchor="middle">
+                      {String(pt.time.getHours()).padStart(2, '0')}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+          ) : (
+            <div className="flex items-center justify-center h-full text-gray-400">데이터가 없습니다</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // 좌측 그래프 컴포넌트 (선택된 현장 24시간 수위/유량 그래프)
@@ -226,7 +378,7 @@ function SiteGraphs({ selectedSite, sensorData, onClose }: { selectedSite: Site 
                     return (
                       <g key={`tick-${i}`}>
                         <line x1={x} y1="0" x2={x} y2="280" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
-                        <text x={x} y="300" fontSize="10" fill="#6b7280" textAnchor="middle">{String(t.getHours()).padStart(2, '0')}</text>
+                        <text x={x} y="220" fontSize="10" fill="#6b7280" textAnchor="middle">{String(t.getHours()).padStart(2, '0')}</text>
                       </g>
                     );
                   });
@@ -334,7 +486,7 @@ function SiteGraphs({ selectedSite, sensorData, onClose }: { selectedSite: Site 
                     return (
                       <g key={`tickf-${i}`}>
                         <line x1={x} y1="0" x2={x} y2="280" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
-                        <text x={x} y="300" fontSize="10" fill="#6b7280" textAnchor="middle">{String(t.getHours()).padStart(2, '0')}</text>
+                        <text x={x} y="220" fontSize="10" fill="#6b7280" textAnchor="middle">{String(t.getHours()).padStart(2, '0')}</text>
                       </g>
                     );
                   });
@@ -442,7 +594,7 @@ function SiteGraphs({ selectedSite, sensorData, onClose }: { selectedSite: Site 
                     return (
                       <g key={`tickc-${i}`}>
                         <line x1={x} y1="0" x2={x} y2="280" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
-                        <text x={x} y="300" fontSize="10" fill="#6b7280" textAnchor="middle">{String(t.getHours()).padStart(2, '0')}</text>
+                        <text x={x} y="220" fontSize="10" fill="#6b7280" textAnchor="middle">{String(t.getHours()).padStart(2, '0')}</text>
                       </g>
                     );
                   });
@@ -457,6 +609,8 @@ function SiteGraphs({ selectedSite, sensorData, onClose }: { selectedSite: Site 
     </div>
   );
 }
+
+
 
 export default function SiteManagement() {
   const { toast } = useToast();
@@ -492,6 +646,63 @@ export default function SiteManagement() {
       return Math.PI * Math.pow(width / 2, 2) * height;
     } else {
       return width * length * height;
+    }
+  };
+
+  // PDF 다운로드 함수들
+  const downloadSitePdf = async (siteId: string) => {
+    try {
+      // 선택된 현장이 있는지 확인
+      if (!selectedSite) {
+        toast({
+          title: "현장 선택 필요",
+          description: "인쇄할 현장을 먼저 선택해주세요.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // 현장 인쇄 페이지로 이동
+      navigate('/site-print', {
+        state: {
+          site: selectedSite,
+          sensorData: sensorData
+        }
+      });
+      
+      toast({
+        title: "현장 상세 보고서 페이지로 이동",
+        description: `${selectedSite.name} 현장 상세 보고서를 확인하고 인쇄할 수 있습니다.`,
+      });
+    } catch (error) {
+      console.error('페이지 이동 오류:', error);
+      toast({
+        title: "페이지 이동 실패",
+        description: "인쇄 페이지로 이동할 수 없습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const downloadAllSitesPdf = async () => {
+    try {
+      // 전체 현장 인쇄 페이지로 이동
+      navigate('/all-sites-print', {
+        state: {
+          sites: sites,
+          sensorData: sensorData,
+          latestBySiteId: latestBySiteId
+        }
+      });
+      
+      // 토스트 메시지 제거 - 전체 현장 인쇄 시 팝업 안 뜨게 함
+    } catch (error) {
+      console.error('페이지 이동 오류:', error);
+      toast({
+        title: "페이지 이동 실패",
+        description: "인쇄 페이지로 이동할 수 없습니다.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -564,7 +775,7 @@ export default function SiteManagement() {
         setSites(res.data.map(mapSite));
       }
     } catch (e: any) {
-      toast({ title: "사이트 목록 로딩 실패", description: e.message, variant: "destructive" });
+      toast({ title: "현장 목록 로딩 실패", description: e.message, variant: "destructive" });
     }
   }, [toast]);
 
@@ -619,7 +830,7 @@ export default function SiteManagement() {
           status: formData.status!,
         };
         await apiClient.updateSite(editingSite.managementNumber, payload);
-        toast({ title: "사이트 수정 완료" });
+        toast({ title: "현장 수정 완료" });
         setEditingSite(null);
       } else {
         const payload: CreateOrUpdateSiteRequest = {
@@ -635,7 +846,7 @@ export default function SiteManagement() {
           memberId: null,
         };
         await apiClient.createSite(payload);
-        toast({ title: "사이트가 추가되었습니다." });
+        toast({ title: "현장이 추가되었습니다." });
       }
       await loadSites();
       setFormData({
@@ -671,6 +882,42 @@ export default function SiteManagement() {
     }
   };
 
+  const handlePrintSite = (site: Site) => {
+    try {
+      // 해당 현장의 센서 데이터만 필터링
+      const siteSensorData = sensorData.filter(data => data.siteId === site.id);
+      
+      // 현장 인쇄 페이지로 이동
+      navigate('/site-print', {
+        state: {
+          site: {
+            id: site.id,
+            name: site.name,
+            managementNumber: site.managementNumber,
+            contactPerson: site.contactPerson,
+            contactPhone: site.contactPhone,
+            tankType: site.tankType,
+            width: site.width,
+            length: site.length,
+            height: site.height,
+            volume: site.volume,
+            status: site.status
+          },
+          sensorData: siteSensorData
+        }
+      });
+      
+      // 토스트 메시지 제거 - 현장 인쇄 시 팝업 안 뜨게 함
+    } catch (error) {
+      console.error('페이지 이동 오류:', error);
+      toast({
+        title: "페이지 이동 실패",
+        description: "인쇄 페이지로 이동할 수 없습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active": return "default";
@@ -692,10 +939,14 @@ export default function SiteManagement() {
   const SitesTable = () => (
     <Card>
       <CardContent className="p-0">
+        {/* 인쇄용 테이블 제목 */}
+        <div className="print-table-title" style={{ display: 'none' }}>
+          <h2 className="text-xl font-bold text-gray-900 text-center py-4">현장 목록</h2>
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>사이트 정보</TableHead>
+              <TableHead>현장 정보</TableHead>
               <TableHead>담당자</TableHead>
               <TableHead>탱크 사양</TableHead>
               <TableHead>용량</TableHead>
@@ -708,37 +959,32 @@ export default function SiteManagement() {
             {filteredSites.map((site) => (
               <TableRow
                 key={site.id}
-                className={`${selectedSite?.id === site.id ? 'bg-blue-50' : ''} hover:bg-gray-50`}
+                className={`${selectedSite?.id === site.id ? 'bg-blue-50' : ''} hover:bg-gray-50 site-info-row`}
                 onClick={() => setSelectedSite(site)}
               >
                 <TableCell>
                   <div>
-                    <button
-                      type="button"
-                      className="font-semibold text-blue-700 hover:underline"
-                      onClick={(e) => { e.stopPropagation(); navigate(`/test/${encodeURIComponent(site.id)}`); }}
-                      aria-label={`현장 ${site.name} 상세 보기`}
-                    >
+                    <div className="site-name">
                       {site.name}
-                    </button>
-                    <div className="text-sm text-gray-500">{site.managementNumber}</div>
+                    </div>
+                    <div className="site-id">{site.managementNumber}</div>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div>
-                    <div className="text-sm">{site.contactPerson}</div>
-                    <div className="text-xs text-gray-500 flex items-center">
+                  <div className="contact-info">
+                    <div>{site.contactPerson}</div>
+                    <div className="flex items-center">
                       <Phone className="h-3 w-3 mr-1" />
                       {site.contactPhone}
                     </div>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div>
+                  <div className="tank-specs">
                     <Badge variant="outline" className="mb-1">
                       {site.tankType === 'circular' ? '원형' : '사각형'}
                     </Badge>
-                    <div className="text-xs text-gray-500">
+                    <div>
                       {site.tankType === 'circular'
                         ? `⌀${site.width}m × ${site.height}m`
                         : `${site.width}m × ${site.length}m × ${site.height}m`}
@@ -746,35 +992,45 @@ export default function SiteManagement() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="text-sm font-medium">
+                  <div className="capacity">
                     {site.volume.toFixed(1)} m³
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="space-y-1">
-                    <div className="flex items-center text-xs">
+                  <div className="realtime-data">
+                    <div className="flex items-center">
                       <Activity className="h-3 w-3 mr-1 text-blue-500" />
                       유량: {latestBySiteId[site.id]?.flowRate !== undefined ? latestBySiteId[site.id].flowRate.toFixed(1) : '-'} L/min
                     </div>
-                    <div className="flex items-center text-xs">
+                    <div className="flex items-center">
                       <Gauge className="h-3 w-3 mr-1 text-green-500" />
                       누적: {latestBySiteId[site.id]?.totalAmount !== undefined ? latestBySiteId[site.id].totalAmount.toFixed(1) : '-'} L
                     </div>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={getStatusBadge(site.status) as any}>
+                  <span className={`status-badge status-${site.status}`}>
                     {getStatusText(site.status)}
-                  </Badge>
+                  </span>
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 action-buttons">
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={(e) => { e.stopPropagation(); handleEdit(site); }}
                     >
                       <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        handlePrintSite(site); 
+                      }}
+                    >
+                      <FileText className="h-3 w-3" />
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
@@ -784,7 +1040,7 @@ export default function SiteManagement() {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>사이트 삭제</AlertDialogTitle>
+                          <AlertDialogTitle>현장 삭제</AlertDialogTitle>
                           <AlertDialogDescription>
                             정말로 "{site.name}"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
                           </AlertDialogDescription>
@@ -809,6 +1065,8 @@ export default function SiteManagement() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* PDF 컴포넌트들은 별도 페이지로 이동 */}
+      
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
@@ -986,7 +1244,7 @@ export default function SiteManagement() {
                   취소
                 </Button>
                 <Button onClick={handleSubmit}>
-                  {editingSite ? "사이트 수정" : "사이트 추가"}
+                  {editingSite ? "현장 수정" : "현장 추가"}
                 </Button>
               </div>
             </DialogContent>
@@ -998,22 +1256,46 @@ export default function SiteManagement() {
         {/* Search and Filters */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="text-lg">사이트 목록</CardTitle>
+            <CardTitle className="text-lg">현장 목록</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center space-x-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="사이트명, 관리번호, 담당자명, 연락처 검색"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+                          <div className="relative flex-1 search-and-filter-controls">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="현장명, 관리번호, 담당자명, 연락처 검색"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
               <Badge variant="secondary">
-                {filteredSites.length} / {sites.length} 사이트
+                {filteredSites.length} / {sites.length} 현장
               </Badge>
+              
+              {/* PDF 다운로드 버튼들 */}
+              <div className="flex items-center space-x-2 print-button-group">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => downloadAllSitesPdf()}
+                  className="flex items-center space-x-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  <span className="hidden sm:inline">전체 현장 PDF출력</span>
+                </Button>
+                {selectedSite && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadSitePdf(selectedSite.id)}
+                    className="flex items-center space-x-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span className="hidden sm:inline">현장 PDF출력</span>
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -1022,7 +1304,7 @@ export default function SiteManagement() {
         {selectedSite ? (
           <div className="grid grid-cols-10 gap-4">
             {/* Left 4/10: Selected site graphs */}
-            <div className="col-span-10 lg:col-span-4">
+            <div className="col-span-10 lg:col-span-4 site-graphs-container">
               <SiteGraphs selectedSite={selectedSite} sensorData={sensorData} onClose={() => setSelectedSite(null)} />
             </div>
             {/* Right 6/10: Sites Table */}
@@ -1031,9 +1313,15 @@ export default function SiteManagement() {
             </div>
           </div>
         ) : (
-          <SitesTable />
+          <>
+            <SitesTable />
+            
+
+          </>
         )}
       </div>
+      
+      {/* 인쇄용 푸터는 별도 페이지에서 처리됩니다 */}
     </div>
   );
 }

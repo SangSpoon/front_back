@@ -11,6 +11,8 @@ import SignUp from "./pages/SignUp";
 import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import SiteManagement from "./pages/SiteManagement";
+import AllSitesPrint from "./pages/AllSitesPrint";
+import SitePrint from "./pages/SitePrint";
 
 import SiteDetails from "./pages/SiteDetails";
 import Statistics from "./pages/Statistics";
@@ -49,6 +51,18 @@ const App = () => (
             <Route path="/sites/:id" element={
               <ProtectedRoute>
                 <SiteDetails />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/all-sites-print" element={
+              <ProtectedRoute>
+                <AllSitesPrint />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/site-print" element={
+              <ProtectedRoute>
+                <SitePrint />
               </ProtectedRoute>
             } />
 

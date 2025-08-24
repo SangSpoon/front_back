@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ParsedDataRepository extends JpaRepository<ParsedDataEntity, Long> {
@@ -21,4 +22,9 @@ public interface ParsedDataRepository extends JpaRepository<ParsedDataEntity, Lo
     
     // 🎯 데이터 중복 체크를 위한 메서드 - 특정 시간 범위 내에 데이터가 있는지 확인
     boolean existsBySiteIdAndCreatedAtBetween(String siteId, LocalDateTime startTime, LocalDateTime endTime);
+    
+    // PDF 생성을 위한 메서드들
+    Optional<ParsedDataEntity> findTopBySiteIdOrderByCreatedAtDesc(String siteId);
+    
+    List<ParsedDataEntity> findBySiteIdAndCreatedAtAfterOrderByCreatedAtDesc(String siteId, LocalDateTime after);
 }

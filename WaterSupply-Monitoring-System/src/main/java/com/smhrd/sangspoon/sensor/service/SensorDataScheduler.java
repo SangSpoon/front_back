@@ -105,7 +105,7 @@ public class SensorDataScheduler {
         
         // 물탱크 수위 (이전 값 기반 점진적 변화)
         float waterLevelChange;
-        if (probability < 0.5) {
+        if (probability < 0.80) {
             // 99% 확률: 작은 변화 (-1.5 ~ +1.5)
             waterLevelChange = (random.nextFloat() - 0.5f) * 3.0f;
         } else {
@@ -124,7 +124,7 @@ public class SensorDataScheduler {
         
         // 약품 레벨 (이전 값 기반 점진적 변화)
         float chemicalLevelChange;
-        if (probability < 0.5) {
+        if (probability < 0.80) {
             // 99% 확률: 작은 변화 (-1.5 ~ +1.5)
             chemicalLevelChange = (random.nextFloat() - 0.5f) * 3.0f;
         } else {
@@ -138,7 +138,7 @@ public class SensorDataScheduler {
         
         // 유량 (이전 값 기반 점진적 변화)
         float flowRateChange;
-        if (probability < 0.5) {
+        if (probability < 0.80) {
             // 99% 확률: 작은 변화 (-1.0 ~ +1.0 L/min)
             flowRateChange = (random.nextFloat() - 0.5f) * 2.0f;
         } else {
