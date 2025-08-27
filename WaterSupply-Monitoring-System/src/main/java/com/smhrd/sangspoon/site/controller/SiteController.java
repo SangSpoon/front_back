@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 @RestController
@@ -36,7 +37,11 @@ public class SiteController {
             Double width,
             Double height,
             String status,
-            Long memberId
+            Long memberId,
+            // 위치 필드 추가
+            String location,
+            BigDecimal latitude,
+            BigDecimal longitude
     ) {}
 
     public record ApiResponse<T>(boolean success, String message, T data) {}
@@ -54,7 +59,11 @@ public class SiteController {
             Double calculatedVolume,
             Long memberId,
             String memberName,
-            String memberLoginId
+            String memberLoginId,
+            // 위치 필드 추가
+            String location,
+            BigDecimal latitude,
+            BigDecimal longitude
     ) {}
 
     private static String normalizeTankType(String raw) {
@@ -104,7 +113,11 @@ public class SiteController {
                 volume,
                 memberId,
                 memberName,
-                memberLoginId
+                memberLoginId,
+                // 위치 필드 매핑 추가
+                e.getLocation(),
+                e.getLatitude(),
+                e.getLongitude()
         );
     }
 
@@ -129,6 +142,27 @@ public class SiteController {
         entity.setHeight(Optional.ofNullable(req.height()).orElse(0.0));
         entity.setStatus(parseStatus(req.status()));
 
+        // 위치 필드 설정 추가 - 유효성 검사 포함
+        entity.setLocation(Optional.ofNullable(req.location()).filter(v -> !v.isBlank()).orElse(null));
+        
+        // 위도/경도 유효성 검사 및 설정
+        if (req.latitude() != null && req.longitude() != null) {
+            // 위도: -90 ~ 90, 경도: -180 ~ 180 범위 검사
+            if (req.latitude().doubleValue() >= -90 && req.latitude().doubleValue() <= 90 &&
+                req.longitude().doubleValue() >= -180 && req.longitude().doubleValue() <= 180) {
+                entity.setLatitude(req.latitude());
+                entity.setLongitude(req.longitude());
+                log.info("위치 좌표 설정: 위도={}, 경도={}", req.latitude(), req.longitude());
+            } else {
+                log.warn("잘못된 좌표값: 위도={}, 경도={}", req.latitude(), req.longitude());
+                entity.setLatitude(null);
+                entity.setLongitude(null);
+            }
+        } else {
+            entity.setLatitude(null);
+            entity.setLongitude(null);
+        }
+
         // 세션의 로그인 회원만 사용 (요청의 memberId는 무시)
         Object loginMemberObj = session.getAttribute("loginMember");
         if (!(loginMemberObj instanceof MemberEntity loginMember)) {
@@ -146,7 +180,12 @@ public class SiteController {
         }
 
         SiteEntity saved = siteRepository.save(entity);
-        log.info("Saved site managementCode={} with memberId={}", saved.getManagementCode(), saved.getMember() != null ? saved.getMember().getId() : null);
+        log.info("Saved site managementCode={} with memberId={}, location={}, coordinates=({}, {})", 
+                saved.getManagementCode(), 
+                saved.getMember() != null ? saved.getMember().getId() : null,
+                saved.getLocation(),
+                saved.getLatitude(),
+                saved.getLongitude());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ApiResponse<>(true, "사이트가 생성되었습니다.", toResponse(saved)));
     }
@@ -186,7 +225,36 @@ public class SiteController {
             memberRepository.findById(req.memberId()).ifPresent(entity::setMember);
         }
 
+        // 위치 필드 업데이트 - 유효성 검사 포함
+        if (req.location() != null) {
+            entity.setLocation(req.location().isBlank() ? null : req.location());
+        }
+        
+        // 위도/경도 업데이트 - 유효성 검사 포함
+        if (req.latitude() != null && req.longitude() != null) {
+            // 위도: -90 ~ 90, 경도: -180 ~ 180 범위 검사
+            if (req.latitude().doubleValue() >= -90 && req.latitude().doubleValue() <= 90 &&
+                req.longitude().doubleValue() >= -180 && req.longitude().doubleValue() <= 180) {
+                entity.setLatitude(req.latitude());
+                entity.setLongitude(req.longitude());
+                log.info("위치 좌표 업데이트: 위도={}, 경도={}", req.latitude(), req.longitude());
+            } else {
+                log.warn("잘못된 좌표값으로 업데이트 실패: 위도={}, 경도={}", req.latitude(), req.longitude());
+                // 기존 값 유지
+            }
+        } else if (req.latitude() == null && req.longitude() == null) {
+            // 둘 다 null이면 좌표 정보 제거
+            entity.setLatitude(null);
+            entity.setLongitude(null);
+            log.info("위치 좌표 정보 제거");
+        }
+
         SiteEntity saved = siteRepository.save(entity);
+        log.info("Updated site managementCode={} with location={}, coordinates=({}, {})", 
+                saved.getManagementCode(),
+                saved.getLocation(),
+                saved.getLatitude(),
+                saved.getLongitude());
         return ResponseEntity.ok(new ApiResponse<>(true, "사이트가 수정되었습니다.", toResponse(saved)));
     }
 
@@ -198,6 +266,46 @@ public class SiteController {
         }
         siteRepository.deleteById(managementCode);
         return ResponseEntity.ok(new ApiResponse<>(true, "사이트가 삭제되었습니다.", null));
+    }
+
+    // DB 연결 및 테이블 구조 테스트용 엔드포인트
+    @GetMapping("/test/db-connection")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> testDbConnection() {
+        try {
+            Map<String, Object> result = new HashMap<>();
+            
+            // 전체 사이트 수 조회
+            long totalSites = siteRepository.count();
+            result.put("totalSites", totalSites);
+            
+            // 최근 사이트 5개 조회 (위치 정보 포함)
+            List<SiteResponse> recentSites = siteRepository.findAll().stream()
+                    .limit(5)
+                    .map(SiteController::toResponse)
+                    .toList();
+            result.put("recentSites", recentSites);
+            
+            // 위치 정보가 있는 사이트 수
+            long sitesWithLocation = siteRepository.findAll().stream()
+                    .filter(site -> site.getLocation() != null && !site.getLocation().isBlank())
+                    .count();
+            result.put("sitesWithLocation", sitesWithLocation);
+            
+            // 좌표 정보가 있는 사이트 수
+            long sitesWithCoordinates = siteRepository.findAll().stream()
+                    .filter(site -> site.getLatitude() != null && site.getLongitude() != null)
+                    .count();
+            result.put("sitesWithCoordinates", sitesWithCoordinates);
+            
+            log.info("DB 연결 테스트 성공: 총 사이트={}, 위치정보={}, 좌표정보={}", 
+                    totalSites, sitesWithLocation, sitesWithCoordinates);
+            
+            return ResponseEntity.ok(new ApiResponse<>(true, "DB 연결 테스트 성공", result));
+        } catch (Exception e) {
+            log.error("DB 연결 테스트 실패", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse<>(false, "DB 연결 테스트 실패: " + e.getMessage(), null));
+        }
     }
 }
 

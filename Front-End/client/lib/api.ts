@@ -28,12 +28,16 @@ export interface CreateOrUpdateSiteRequest {
   siteName: string;
   contactNumber: string;
   manager?: string;
+  location?: string; // 위치 필드 추가
   tankType: string; // "circular" | "square" 등
   length: number;
   width: number;
   height: number;
   status: string; // active | inactive | maintenance
   memberId?: number | null;
+  // 위도/경도 필드 추가
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface SiteResponse {
@@ -41,6 +45,7 @@ export interface SiteResponse {
   siteName: string;
   contactNumber: string;
   manager?: string | null;
+  location?: string; // 위치 필드 추가
   tankType: string;
   length: number;
   width: number;
@@ -50,6 +55,9 @@ export interface SiteResponse {
   memberId?: number | null;
   memberName?: string | null;
   memberLoginId?: string | null;
+  // 위도/경도 필드 추가
+  latitude?: number;
+  longitude?: number;
 }
 
 class ApiClient {

@@ -26,7 +26,9 @@ import {
   Download
 } from "lucide-react";
 import { apiClient, type CreateOrUpdateSiteRequest, type SiteResponse } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { LocationInput } from "@/components/LocationInput";
 import HeaderNav from "@/components/Header";
 
 // 인쇄용 스타일은 별도 페이지에서 처리됩니다
@@ -37,6 +39,9 @@ interface Site {
   managementNumber: string;
   contactPerson: string;
   contactPhone: string;
+  location: string; // 위치 필드 추가
+  latitude: number | null;    // 위도 추가
+  longitude: number | null;   // 경도 추가
   tankType: "circular" | "square";
   width: number;
   length: number;
@@ -73,6 +78,9 @@ function mapSite(resp: SiteResponse): Site {
     managementNumber: resp.managementCode,
     contactPerson: resp.manager || resp.memberName || "",
     contactPhone: resp.contactNumber || "",
+    location: resp.location || "", // 위치 필드 추가
+    latitude: resp.latitude || null, // 위도 추가
+    longitude: resp.longitude || null, // 경도 추가
     tankType,
     width: resp.width || 0,
     length: resp.length || 0,
@@ -627,6 +635,9 @@ export default function SiteManagement() {
     managementNumber: "",
     contactPerson: "",
     contactPhone: "",
+    location: "",
+    latitude: null,    // 위도 추가
+    longitude: null,   // 경도 추가
     tankType: "circular",
     width: 0,
     length: 0,
@@ -723,6 +734,27 @@ export default function SiteManagement() {
 
   const handleContactPhoneChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, contactPhone: e.target.value }));
+  }, []);
+
+  // 위치 선택 핸들러 추가
+  const handleLocationSelect = useCallback((location: string, latitude: number, longitude: number) => {
+    setFormData(prev => ({
+      ...prev,
+      location,
+      latitude,
+      longitude
+    }));
+    console.log('위치 선택됨:', { location, latitude, longitude });
+  }, []);
+
+  const handleLatitudeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseFloat(e.target.value) || null;
+    setFormData(prev => ({ ...prev, latitude: value }));
+  }, []);
+
+  const handleLongitudeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseFloat(e.target.value) || null;
+    setFormData(prev => ({ ...prev, longitude: value }));
   }, []);
 
   const handleWidthChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -823,11 +855,14 @@ export default function SiteManagement() {
           siteName: formData.name!,
           contactNumber: formData.contactPhone!,
           manager: formData.contactPerson || undefined,
+          location: formData.location || undefined, // 위치 정보 추가
           tankType: formData.tankType!,
           length: formData.tankType === "square" ? formData.length || 0 : 0,
           width: formData.width || 0,
           height: formData.height || 0,
           status: formData.status!,
+          latitude: formData.latitude || undefined, // 위도 추가
+          longitude: formData.longitude || undefined, // 경도 추가
         };
         await apiClient.updateSite(editingSite.managementNumber, payload);
         toast({ title: "현장 수정 완료" });
@@ -838,11 +873,14 @@ export default function SiteManagement() {
           siteName: formData.name!,
           contactNumber: formData.contactPhone!,
           manager: formData.contactPerson || undefined,
+          location: formData.location || undefined, // 위치 정보 추가
           tankType: formData.tankType!,
           length: formData.tankType === "square" ? formData.length || 0 : 0,
           width: formData.width || 0,
           height: formData.height || 0,
           status: formData.status!,
+          latitude: formData.latitude || undefined, // 위도 추가
+          longitude: formData.longitude || undefined, // 경도 추가
           memberId: null,
         };
         await apiClient.createSite(payload);
@@ -854,6 +892,9 @@ export default function SiteManagement() {
         managementNumber: "",
         contactPerson: "",
         contactPhone: "",
+        location: "", // 위치 필드 추가
+        latitude: null,    // 위도 추가
+        longitude: null,   // 경도 추가
         tankType: "circular",
         width: 0,
         length: 0,
@@ -901,7 +942,9 @@ export default function SiteManagement() {
             length: site.length,
             height: site.height,
             volume: site.volume,
-            status: site.status
+            status: site.status,
+            latitude: site.latitude, // 위도 추가
+            longitude: site.longitude // 경도 추가
           },
           sensorData: siteSensorData
         }
@@ -913,6 +956,20 @@ export default function SiteManagement() {
       toast({
         title: "페이지 이동 실패",
         description: "인쇄 페이지로 이동할 수 없습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleViewMap = (site: Site) => {
+    try {
+      // 지도 페이지로 이동
+      navigate('/site-map', { state: { site } });
+    } catch (error) {
+      console.error('지도 보기 오류:', error);
+      toast({
+        title: "지도 보기 실패",
+        description: "지도를 불러올 수 없습니다.",
         variant: "destructive",
       });
     }
@@ -948,6 +1005,7 @@ export default function SiteManagement() {
             <TableRow>
               <TableHead>현장 정보</TableHead>
               <TableHead>담당자</TableHead>
+              <TableHead>위치</TableHead>
               <TableHead>탱크 사양</TableHead>
               <TableHead>용량</TableHead>
               <TableHead>실시간 데이터</TableHead>
@@ -977,6 +1035,18 @@ export default function SiteManagement() {
                       <Phone className="h-3 w-3 mr-1" />
                       {site.contactPhone}
                     </div>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="location-info">
+                    {site.location ? (
+                      <div className="flex items-center">
+                        <MapPin className="h-3 w-3 mr-1 text-gray-500" />
+                        <span className="text-sm text-gray-600">{site.location}</span>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-400">위치 정보 없음</span>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -1053,6 +1123,18 @@ export default function SiteManagement() {
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
+                    
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        handleViewMap(site); 
+                      }}
+                      title="지도 보기"
+                    >
+                      <MapPin className="h-3 w-3" />
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -1138,6 +1220,41 @@ export default function SiteManagement() {
                       value={formData.contactPhone || ""}
                       onChange={handleContactPhoneChange}
                       placeholder="+82-10-1234-5678"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">위치</label>
+                  <LocationInput
+                    value={formData.location || ""}
+                    onChange={(location) => setFormData(prev => ({ ...prev, location }))}
+                    onLocationSelect={handleLocationSelect}
+                    placeholder="위치를 입력하세요 (예: 광주광역시)"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">위도</label>
+                    <Input
+                      key="latitude"
+                      type="number"
+                      value={formData.latitude || ""}
+                      onChange={handleLatitudeChange}
+                      placeholder="예: 37.500000"
+                      readOnly
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">경도</label>
+                    <Input
+                      key="longitude"
+                      type="number"
+                      value={formData.longitude || ""}
+                      onChange={handleLongitudeChange}
+                      placeholder="예: 127.000000"
+                      readOnly
                     />
                   </div>
                 </div>
@@ -1234,6 +1351,9 @@ export default function SiteManagement() {
                     managementNumber: "",
                     contactPerson: "",
                     contactPhone: "",
+                    location: "", // 위치 필드 추가
+                    latitude: null,    // 위도 추가
+                    longitude: null,   // 경도 추가
                     tankType: "circular",
                     width: 0,
                     length: 0,

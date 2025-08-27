@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import SiteManagement from "./pages/SiteManagement";
 import AllSitesPrint from "./pages/AllSitesPrint";
 import SitePrint from "./pages/SitePrint";
+import SiteMap from "./pages/SiteMap";
 import EmailAlerts from "./pages/EmailAlerts";
 
 import SiteDetails from "./pages/SiteDetails";
@@ -64,6 +65,12 @@ const App = () => (
             <Route path="/site-print" element={
               <ProtectedRoute>
                 <SitePrint />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/site-map" element={
+              <ProtectedRoute>
+                <SiteMap />
               </ProtectedRoute>
             } />
 

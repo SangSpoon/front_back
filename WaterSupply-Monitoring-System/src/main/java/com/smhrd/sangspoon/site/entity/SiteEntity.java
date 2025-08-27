@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Entity
 @AllArgsConstructor
 @NoArgsConstructor
@@ -27,6 +29,16 @@ public class SiteEntity {
     private double height; // 높이
     @Enumerated(EnumType.STRING)
     private Status status;
+
+    // 위치 관련 필드 추가 - 정확한 컬럼명 매핑
+    @Column(name = "location")
+    private String location;
+    
+    @Column(name = "latitude", precision = 17, scale = 14)
+    private BigDecimal latitude;
+    
+    @Column(name = "longitude", precision = 17, scale = 14)
+    private BigDecimal longitude;
 
     @ManyToOne
     @JoinColumn(name = "member_id", nullable = true)
