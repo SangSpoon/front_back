@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import SiteManagement from "./pages/SiteManagement";
 import AllSitesPrint from "./pages/AllSitesPrint";
 import SitePrint from "./pages/SitePrint";
+import EmailAlerts from "./pages/EmailAlerts";
 
 import SiteDetails from "./pages/SiteDetails";
 import Statistics from "./pages/Statistics";
@@ -89,6 +90,7 @@ const App = () => (
             <Route path="/api-test" element={<AuthExample />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
+            <Route path="/email-alerts" element={<EmailAlerts />} />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
