@@ -18,30 +18,43 @@ import java.math.BigDecimal;
 public class SiteEntity {
 
     @Id
+    @Column(name = "management_code")
     private String managementCode;
 
+    @Column(name = "site_name")
     private String siteName;
+
+    @Column(name = "contact_number")
     private String contactNumber;
+
+    @Column(name = "manager")
     private String manager; // 담당자 이름 -> DB 컬럼 'manager'
+
+    @Column(name = "tank_type")
     private String tankType; // VARCHAR로 변경
+
+    @Column(name = "length")
     private double length; // 가로
+
+    @Column(name = "width")
     private double width; // 세로
+
+    @Column(name = "height")
     private double height; // 높이
+
     @Enumerated(EnumType.STRING)
+    @Column(name = "status")
     private Status status;
 
     // 위치 관련 필드 추가 - 정확한 컬럼명 매핑
-    @Column(name = "location")
     private String location;
     
-    @Column(name = "latitude", precision = 17, scale = 14)
     private BigDecimal latitude;
     
-    @Column(name = "longitude", precision = 17, scale = 14)
     private BigDecimal longitude;
 
     @ManyToOne
-    @JoinColumn(name = "member_id", nullable = true)
+    @JoinColumn(name = "member_id")
     private MemberEntity member;
 
     public enum Status {
@@ -61,13 +74,5 @@ public class SiteEntity {
             return length * width * height;
         }
         return 0.0;
-    }
-
-    public boolean isCircle() {
-        return "Circle".equals(tankType);
-    }
-
-    public boolean isSquare() {
-        return "Square".equals(tankType);
     }
 }

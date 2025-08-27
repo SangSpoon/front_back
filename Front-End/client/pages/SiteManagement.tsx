@@ -26,7 +26,6 @@ import {
   Download
 } from "lucide-react";
 import { apiClient, type CreateOrUpdateSiteRequest, type SiteResponse } from "@/lib/api";
-import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { LocationInput } from "@/components/LocationInput";
 import HeaderNav from "@/components/Header";
@@ -98,148 +97,6 @@ function mapSite(resp: SiteResponse): Site {
 
 // PDF 컴포넌트들은 별도 페이지로 이동했습니다
 
-// 전체 현장 통합 그래프 컴포넌트 (인쇄용)
-function AllSitesGraphs({ sites, sensorData }: { sites: Site[]; sensorData: SensorData[] }) {
-  const now = new Date().getTime();
-  const recentData = sensorData.filter(d => now - new Date(d.createdAt).getTime() <= 24 * 60 * 60 * 1000);
-  
-  // 모든 현장의 데이터를 시간별로 그룹화
-  const timeGroups: Record<string, { waterLevel: number; flowRate: number; count: number }> = {};
-  
-  recentData.forEach(d => {
-    const timeKey = new Date(d.createdAt).toISOString().slice(0, 13); // 시간별 그룹화
-    if (!timeGroups[timeKey]) {
-      timeGroups[timeKey] = { waterLevel: 0, flowRate: 0, count: 0 };
-    }
-    timeGroups[timeKey].waterLevel += d.waterLevel;
-    timeGroups[timeKey].flowRate += d.flowRate;
-    timeGroups[timeKey].count += 1;
-  });
-
-  // 평균값 계산 및 시간순 정렬
-  const averagedData = Object.entries(timeGroups)
-    .map(([time, data]) => ({
-      time: new Date(time),
-      waterLevel: data.waterLevel / data.count,
-      flowRate: data.flowRate / data.count
-    }))
-    .sort((a, b) => a.time.getTime() - b.time.getTime());
-
-  const maxFlowRate = Math.max(1, ...averagedData.map(d => d.flowRate));
-
-  return (
-    <div className="space-y-6">
-      {/* 수위 변화 그래프 */}
-      <div className="bg-white p-4 rounded-lg border">
-        <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">전체 현장 24시간 평균 수위 변화 (%)</h3>
-        <div className="h-48 relative">
-          {averagedData.length > 1 ? (
-            <svg className="w-full h-full" viewBox="0 0 800 240">
-              {/* 축/눈금 */}
-              <line x1="0" y1="0" x2="0" y2="200" stroke="#e5e7eb" strokeWidth="1" />
-              <line x1="0" y1="0" x2="800" y2="0" stroke="#e5e7eb" strokeWidth="1" />
-              <line x1="0" y1="50" x2="800" y2="50" stroke="#e5e7eb" strokeWidth="0.5" />
-              <line x1="0" y1="100" x2="800" y2="100" stroke="#e5e7eb" strokeWidth="0.5" />
-              <line x1="0" y1="150" x2="800" y2="150" stroke="#e5e7eb" strokeWidth="0.5" />
-              
-              {/* Y 라벨 */}
-              <text x="5" y="15" fontSize="12" fill="#6b7280">100%</text>
-              <text x="5" y="65" fontSize="12" fill="#6b7280">75%</text>
-              <text x="5" y="115" fontSize="12" fill="#6b7280">50%</text>
-              <text x="5" y="165" fontSize="12" fill="#6b7280">25%</text>
-
-              {/* 수위 그래프 */}
-              {averagedData.map((pt, idx) => {
-                if (idx === 0) return null;
-                const cx = 50 + (idx / (averagedData.length - 1)) * 700;
-                const px = 50 + ((idx - 1) / (averagedData.length - 1)) * 700;
-                const cy = 200 - (pt.waterLevel / 100) * 200;
-                const py = 200 - (averagedData[idx - 1].waterLevel / 100) * 200;
-                return (
-                  <g key={`water-${idx}`}>
-                    <line x1={px} y1={py} x2={cx} y2={cy} stroke="#3b82f6" strokeWidth="2" />
-                    <circle cx={cx} cy={cy} r="3" fill="#3b82f6" />
-                  </g>
-                );
-              })}
-
-              {/* X축 시간 라벨 */}
-              {averagedData.map((pt, idx) => {
-                if (idx % 3 !== 0) return null; // 3시간 간격으로 라벨 표시
-                const x = 50 + (idx / (averagedData.length - 1)) * 700;
-                return (
-                  <g key={`time-${idx}`}>
-                    <line x1={x} y1="0" x2={x} y2="200" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
-                    <text x={x} y="220" fontSize="10" fill="#6b7280" textAnchor="middle">
-                      {String(pt.time.getHours()).padStart(2, '0')}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
-          ) : (
-            <div className="flex items-center justify-center h-full text-gray-400">데이터가 없습니다</div>
-          )}
-        </div>
-      </div>
-
-      {/* 유량 변화 그래프 */}
-      <div className="bg-white p-4 rounded-lg border">
-        <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">전체 현장 24시간 평균 유량 변화 (L/min)</h3>
-        <div className="h-48 relative">
-          {averagedData.length > 1 ? (
-            <svg className="w-full h-full" viewBox="0 0 800 240">
-              {/* 축/눈금 */}
-              <line x1="0" y1="0" x2="0" y2="200" stroke="#e5e7eb" strokeWidth="1" />
-              <line x1="0" y1="0" x2="800" y2="0" stroke="#e5e7eb" strokeWidth="1" />
-              <line x1="0" y1="50" x2="800" y2="50" stroke="#e5e7eb" strokeWidth="0.5" />
-              <line x1="0" y1="100" x2="800" y2="100" stroke="#e5e7eb" strokeWidth="0.5" />
-              <line x1="0" y1="150" x2="800" y2="150" stroke="#e5e7eb" strokeWidth="0.5" />
-              
-              {/* Y 라벨 */}
-              <text x="5" y="15" fontSize="12" fill="#6b7280">{maxFlowRate.toFixed(0)} L/min</text>
-              <text x="5" y="65" fontSize="12" fill="#6b7280">{(maxFlowRate * 0.75).toFixed(0)} L/min</text>
-              <text x="5" y="115" fontSize="12" fill="#6b7280">{(maxFlowRate * 0.5).toFixed(0)} L/min</text>
-              <text x="5" y="165" fontSize="12" fill="#6b7280">{(maxFlowRate * 0.25).toFixed(0)} L/min</text>
-
-              {/* 유량 그래프 */}
-              {averagedData.map((pt, idx) => {
-                if (idx === 0) return null;
-                const cx = 50 + (idx / (averagedData.length - 1)) * 700;
-                const px = 50 + ((idx - 1) / (averagedData.length - 1)) * 700;
-                const cy = 200 - (pt.flowRate / maxFlowRate) * 200;
-                const py = 200 - (averagedData[idx - 1].flowRate / maxFlowRate) * 200;
-                return (
-                  <g key={`flow-${idx}`}>
-                    <line x1={px} y1={py} x2={cx} y2={cy} stroke="#10b981" strokeWidth="2" />
-                    <circle cx={cx} cy={cy} r="3" fill="#10b981" />
-                  </g>
-                );
-              })}
-
-              {/* X축 시간 라벨 */}
-              {averagedData.map((pt, idx) => {
-                if (idx % 3 !== 0) return null; // 3시간 간격으로 라벨 표시
-                const x = 50 + (idx / (averagedData.length - 1)) * 700;
-                return (
-                  <g key={`timef-${idx}`}>
-                    <line x1={x} y1="0" x2={x} y2="200" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
-                    <text x={x} y="220" fontSize="10" fill="#6b7280" textAnchor="middle">
-                      {String(pt.time.getHours()).padStart(2, '0')}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
-          ) : (
-            <div className="flex items-center justify-center h-full text-gray-400">데이터가 없습니다</div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // 좌측 그래프 컴포넌트 (선택된 현장 24시간 수위/유량 그래프)
 function SiteGraphs({ selectedSite, sensorData, onClose }: { selectedSite: Site | null; sensorData: SensorData[]; onClose: () => void }) {
   if (!selectedSite) {
@@ -262,10 +119,7 @@ function SiteGraphs({ selectedSite, sensorData, onClose }: { selectedSite: Site 
   const now = new Date().getTime();
   const recentData = siteData.filter(d => now - new Date(d.createdAt).getTime() <= 24 * 60 * 60 * 1000);
 
-  const maxFlowRate = Math.max(1, ...recentData.map(d => d.flowRate));
-
   // 24시간 고정 간격 설정
-  const timeRangeMs = 24 * 60 * 60 * 1000;
   const intervalMs = 2 * 60 * 60 * 1000; // 2시간 간격
 
   return (
@@ -386,7 +240,9 @@ function SiteGraphs({ selectedSite, sensorData, onClose }: { selectedSite: Site 
                     return (
                       <g key={`tick-${i}`}>
                         <line x1={x} y1="0" x2={x} y2="280" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
-                        <text x={x} y="220" fontSize="10" fill="#6b7280" textAnchor="middle">{String(t.getHours()).padStart(2, '0')}</text>
+                        <text x={x} y="220" fontSize="10" fill="#6b7280" textAnchor="middle">
+                          {String(t.getHours()).padStart(2, '0')}
+                        </text>
                       </g>
                     );
                   });
@@ -494,7 +350,9 @@ function SiteGraphs({ selectedSite, sensorData, onClose }: { selectedSite: Site 
                     return (
                       <g key={`tickf-${i}`}>
                         <line x1={x} y1="0" x2={x} y2="280" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
-                        <text x={x} y="220" fontSize="10" fill="#6b7280" textAnchor="middle">{String(t.getHours()).padStart(2, '0')}</text>
+                        <text x={x} y="220" fontSize="10" fill="#6b7280" textAnchor="middle">
+                          {String(t.getHours()).padStart(2, '0')}
+                        </text>
                       </g>
                     );
                   });
@@ -602,7 +460,9 @@ function SiteGraphs({ selectedSite, sensorData, onClose }: { selectedSite: Site 
                     return (
                       <g key={`tickc-${i}`}>
                         <line x1={x} y1="0" x2={x} y2="280" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="2,2" />
-                        <text x={x} y="220" fontSize="10" fill="#6b7280" textAnchor="middle">{String(t.getHours()).padStart(2, '0')}</text>
+                        <text x={x} y="220" fontSize="10" fill="#6b7280" textAnchor="middle">
+                          {String(t.getHours()).padStart(2, '0')}
+                        </text>
                       </g>
                     );
                   });
@@ -661,7 +521,7 @@ export default function SiteManagement() {
   };
 
   // PDF 다운로드 함수들
-  const downloadSitePdf = async (siteId: string) => {
+  const downloadSitePdf = async () => {
     try {
       // 선택된 현장이 있는지 확인
       if (!selectedSite) {
@@ -972,15 +832,6 @@ export default function SiteManagement() {
         description: "지도를 불러올 수 없습니다.",
         variant: "destructive",
       });
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "active": return "default";
-      case "inactive": return "secondary";
-      case "maintenance": return "destructive";
-      default: return "outline";
     }
   };
 
@@ -1408,7 +1259,7 @@ export default function SiteManagement() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => downloadSitePdf(selectedSite.id)}
+                    onClick={() => downloadSitePdf()}
                     className="flex items-center space-x-2"
                   >
                     <Download className="h-4 w-4" />
