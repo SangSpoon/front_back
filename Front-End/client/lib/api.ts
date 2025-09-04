@@ -52,6 +52,22 @@ export interface SiteResponse {
   memberLoginId?: string | null;
 }
 
+export type PerSiteFlags = {
+  enabled: boolean;
+  highWater: boolean;
+  lowWater: boolean;
+  chemical: boolean;
+  motor1: boolean;
+  motor2: boolean;
+  motorFault: boolean;
+};
+
+export type BackendAlertConfigDTO = {
+  uiEnabled: boolean;
+  recipients: string;
+  matrix: Record<string, PerSiteFlags>;
+};
+
 class ApiClient {
   private async request<T>(
     endpoint: string,
@@ -153,6 +169,19 @@ class ApiClient {
   // 사이트 단건 조회
   async getSite(managementCode: string): Promise<ApiResponse<SiteResponse>> {
     return this.request(`/sites/${encodeURIComponent(managementCode)}`, { method: 'GET' });
+  }
+
+  async getAlertConfig(): Promise<BackendAlertConfigDTO | null> {
+    const res = await this.request<BackendAlertConfigDTO>('/alerts/config', { method: 'GET' });
+    return (res as any)?.data ?? null;
+  }
+
+  async saveAlertConfig(cfg: BackendAlertConfigDTO): Promise<boolean> {
+    const res = await this.request('/alerts/config', {
+      method: 'POST',
+      body: JSON.stringify(cfg),
+    });
+    return !!(res as any)?.success;
   }
 
   // 사이트 수정
