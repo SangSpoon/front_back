@@ -16,6 +16,7 @@
 
 ## 시스템 흐름도
 <img width="1920" height="1080" alt="sangspoon" src="https://github.com/user-attachments/assets/5b1d57e2-d9b8-4d88-a63b-e9f737061dba" />
+
 > 사용자(Front, React)가 로그인/회원가입, 현장 CRUD, 그래프 조회, PDF 요청, 지도 보기 등을 수행<br>
 > Spring Boot API가 요청 받아 인증/권한, 현장 관리, 데이터 조회/PDF 생성 처리<br>
 > 센서 스케줄러가 등록된 현장별로 랜덤 값을 데이터 프로토콜 형식으로 생성 -> 원본(sensor_data)과 파싱(parsed_data)을 MariaDB에 저장<br>
